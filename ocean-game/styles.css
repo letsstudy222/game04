@@ -1,0 +1,231 @@
+/* Abyssal — a deep-sea field-guide aesthetic.
+   Palette: abyss ink, deep teal, bioluminescent aqua signature, foam text. */
+:root {
+  --abyss: #04141d;
+  --deep: #0b2a38;
+  --slate: #7fa6b0;
+  --foam: #eaf3f4;
+  --bio: #57e3c9;          /* bioluminescent signature accent */
+  --bio-dim: #2f8f7f;
+  --panel: rgba(6, 26, 34, 0.62);
+  --hair: rgba(120, 200, 210, 0.18);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--abyss); }
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  color: var(--foam);
+  -webkit-font-smoothing: antialiased;
+}
+#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+
+.overlay {
+  position: fixed; inset: 0; z-index: 10;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(11, 42, 56, 0.35), transparent 60%),
+    radial-gradient(140% 120% at 50% 120%, rgba(4, 20, 29, 0.92), rgba(4, 20, 29, 0.55) 60%, transparent);
+  overflow-y: auto;
+}
+.overlay.center { display: flex; align-items: center; justify-content: center; }
+.hidden { display: none !important; }
+
+/* ---------- Loading ---------- */
+.loader { text-align: center; color: var(--slate); }
+.loader-ring {
+  width: 46px; height: 46px; margin: 0 auto 16px;
+  border: 2px solid var(--hair); border-top-color: var(--bio);
+  border-radius: 50%; animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Menu ---------- */
+.menu-inner {
+  max-width: 1180px; margin: 0 auto; padding: 7vh 28px 40px;
+  min-height: 100%; display: flex; flex-direction: column;
+}
+.menu-head { text-align: center; margin-bottom: 42px; }
+.eyebrow {
+  font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase;
+  color: var(--bio); opacity: 0.85;
+}
+.title {
+  font-family: 'Fraunces', serif; font-weight: 900;
+  font-size: clamp(52px, 11vw, 128px); line-height: 0.9;
+  letter-spacing: 0.02em; margin: 14px 0 10px;
+  color: var(--foam);
+  text-shadow: 0 0 42px rgba(87, 227, 201, 0.28);
+}
+.subtitle {
+  color: var(--slate); font-size: clamp(14px, 1.6vw, 17px);
+  max-width: 620px; margin: 0 auto; line-height: 1.5;
+}
+
+.species-grid {
+  display: grid; gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.species-card {
+  text-align: left; cursor: pointer; color: var(--foam);
+  background: var(--panel); backdrop-filter: blur(8px);
+  border: 1px solid var(--hair); border-radius: 16px;
+  padding: 18px; font-family: inherit;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.species-card:hover, .species-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--bio);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(87, 227, 201, 0.25);
+  outline: none;
+}
+.card-top {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.card-biome { color: var(--accent, var(--bio)); font-weight: 700; }
+.card-size {
+  font-family: 'Fraunces', serif; font-weight: 600; font-size: 20px;
+  letter-spacing: 0; text-transform: none; color: var(--foam);
+}
+.card-name {
+  font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px;
+  line-height: 1.1; margin-bottom: 4px;
+}
+.card-sci { color: var(--slate); font-size: 12.5px; margin-bottom: 14px; }
+.card-sci em { color: #9fc0c8; }
+
+.scale { margin: 12px 0 14px; display: grid; gap: 6px; }
+.scale-row { display: flex; align-items: center; gap: 8px; }
+.scale-lbl { font-size: 10px; color: var(--slate); width: 48px; text-transform: uppercase; letter-spacing: 0.08em; }
+.bar { flex: 1; height: 6px; background: rgba(255, 255, 255, 0.06); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 4px; }
+
+.card-habitat { font-size: 12.5px; color: #b9d2d8; line-height: 1.45; margin-bottom: 8px; }
+.card-fact { font-size: 12px; color: var(--slate); line-height: 1.45; margin-bottom: 16px; }
+.card-cta { font-size: 13px; font-weight: 700; color: var(--bio); letter-spacing: 0.02em; }
+
+.menu-foot {
+  margin-top: 34px; text-align: center; color: var(--slate);
+  font-size: 12.5px; letter-spacing: 0.02em;
+}
+.menu-foot b { color: var(--foam); font-weight: 700; }
+
+/* ---------- HUD ---------- */
+#hud {
+  position: fixed; left: 20px; bottom: 20px; z-index: 8;
+  background: var(--panel); backdrop-filter: blur(8px);
+  border: 1px solid var(--hair); border-radius: 14px;
+  padding: 14px 16px; min-width: 210px;
+  font-size: 13px; letter-spacing: 0.02em;
+}
+.hud-line { display: flex; justify-content: space-between; gap: 18px; padding: 3px 0; }
+.hud-k { color: var(--slate); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.14em; }
+.hud-v { color: var(--foam); font-weight: 500; }
+.hud-compass {
+  position: relative; width: 42px; height: 42px; margin: 10px auto 2px;
+  border: 1px solid var(--hair); border-radius: 50%;
+}
+.needle {
+  position: absolute; left: 50%; top: 50%; width: 2px; height: 16px;
+  background: linear-gradient(var(--bio), transparent);
+  transform-origin: bottom center; transform: translate(-50%, -100%);
+}
+.compass-n { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--bio); }
+
+/* ---------- Sound toggle ---------- */
+.sound-btn {
+  position: fixed; top: 18px; right: 18px; z-index: 12;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--panel); backdrop-filter: blur(6px);
+  border: 1px solid var(--hair); color: var(--foam);
+  font-size: 17px; cursor: pointer; line-height: 1;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.sound-btn:hover, .sound-btn:focus-visible {
+  border-color: var(--bio); transform: scale(1.06); outline: none;
+}
+
+/* ---------- Discovery toasts ---------- */
+#toasts {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 14; display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none; align-items: center;
+}
+.toast {
+  background: var(--panel); backdrop-filter: blur(8px);
+  border: 1px solid var(--bio); border-radius: 999px;
+  padding: 10px 22px; font-size: 13.5px; color: var(--foam);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 22px rgba(87, 227, 201, 0.18);
+  opacity: 0; transform: translateY(-14px); transition: all 0.5s cubic-bezier(0.2, 0.9, 0.3, 1);
+  white-space: nowrap;
+}
+.toast b { color: var(--bio); }
+.toast.in { opacity: 1; transform: translateY(0); }
+.toast.out { opacity: 0; transform: translateY(-10px); }
+
+/* ---------- Field journal ---------- */
+.j-inner {
+  width: min(680px, 92vw); max-height: 86vh; overflow-y: auto;
+  background: var(--panel); backdrop-filter: blur(12px);
+  border: 1px solid var(--hair); border-radius: 20px;
+  padding: 30px 32px;
+}
+.j-head { text-align: center; margin-bottom: 22px; }
+.j-title {
+  font-family: 'Fraunces', serif; font-weight: 600; font-size: 34px;
+  color: var(--foam); margin-top: 8px;
+}
+.j-of { font-size: 17px; color: var(--slate); font-weight: 400; }
+.j-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.j-item {
+  display: flex; gap: 12px; align-items: center;
+  padding: 10px 14px; border-radius: 12px;
+  border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.02);
+}
+.j-item.met { border-color: rgba(87, 227, 201, 0.4); }
+.j-mark {
+  width: 26px; height: 26px; flex: 0 0 26px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  border: 1px solid var(--hair); color: var(--slate);
+}
+.j-item.met .j-mark { border-color: var(--bio); color: var(--bio); }
+.j-body { display: flex; flex-direction: column; min-width: 0; }
+.j-name { font-weight: 700; font-size: 14.5px; color: var(--foam); }
+.j-item:not(.met) .j-name { color: var(--slate); letter-spacing: 0.2em; }
+.j-sub { font-size: 11.5px; color: var(--slate); line-height: 1.4; }
+.j-biomes {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  margin: 20px 0 6px;
+}
+.j-biome {
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 5px 12px; border-radius: 999px; border: 1px solid var(--hair);
+  color: var(--slate);
+}
+.j-biome.met { border-color: var(--bio); color: var(--bio); }
+.j-hint { text-align: center; color: var(--slate); font-size: 12px; margin-top: 16px; }
+.j-hint b { color: var(--foam); }
+.card-met { color: var(--bio); font-weight: 700; }
+
+@media (max-width: 560px) { .j-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Hint ---------- */
+#hint {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 8; background: var(--panel); backdrop-filter: blur(6px);
+  border: 1px solid var(--hair); border-radius: 999px;
+  padding: 9px 18px; font-size: 12.5px; color: var(--slate);
+  transition: opacity 1.2s ease; white-space: nowrap;
+}
+#hint b { color: var(--foam); }
+#hint.fade { opacity: 0; pointer-events: none; }
+
+@media (max-width: 560px) {
+  #hint { white-space: normal; max-width: 90vw; text-align: center; }
+  .menu-inner { padding-top: 5vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader-ring { animation: none; }
+  .species-card { transition: none; }
+}
