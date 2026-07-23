@@ -5,12 +5,12 @@
 
 import * as THREE from 'three';
 
-function mat(color, { flat = true, rough = 0.8, metal = 0.05 } = {}) {
+function mat(color, { flat = false, rough = 0.8, metal = 0.05 } = {}) {
   return new THREE.MeshStandardMaterial({ color, flatShading: flat, roughness: rough, metalness: metal });
 }
 
 // Spindle body along +Z, centered at origin. profile(t 0..1)->radius fraction.
-function spindle(length, maxR, profile, segments = 12, radial = 9) {
+function spindle(length, maxR, profile, segments = 16, radial = 12) {
   const pts = [];
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
@@ -95,6 +95,148 @@ export function buildCreature(species) {
     return root;
   }
 
+  if (shape === 'squid') {
+    // Mantle (cone) + fins + 8 arms + 2 long hunting tentacles.
+    const mantle = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.62, 10), bodyMat);
+    mantle.rotation.x = -Math.PI / 2;      // taper points backward (-Z)
+    mantle.position.z = -0.18;
+    root.add(mantle);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), bodyMat);
+    head.position.z = 0.16; head.scale.set(1, 0.9, 1.1); root.add(head);
+    for (const s of [-1, 1]) {
+      const fin = new THREE.Mesh(sideFin(0.2, 0.26), finMat);
+      fin.material.side = THREE.DoubleSide;
+      fin.position.set(s * 0.08, 0, -0.42);
+      fin.rotation.z = s * 0.5; fin.scale.x = s;
+      root.add(fin);
+    }
+    addEyes(root, 0.045, 0.2, 0.12, 0.03);
+    root._arms = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.008, 0.42, 5), bodyMat);
+      arm.position.set(Math.cos(a) * 0.07, Math.sin(a) * 0.07, 0.44);
+      arm.rotation.x = Math.PI / 2;
+      root.add(arm);
+      root._arms.push({ mesh: arm, phase: i * 0.8, base: arm.position.clone() });
+    }
+    for (const s of [-1, 1]) {          // the two long feeding tentacles
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.03, 0.95, 5), bellyMat);
+      t.position.set(s * 0.05, -0.03, 0.7);
+      t.rotation.x = Math.PI / 2;
+      root.add(t);
+      root._arms.push({ mesh: t, phase: s > 0 ? 0.3 : 2.1, base: t.position.clone() });
+    }
+    root._anim = { kind: 'jet', freq: 1.1, amp: 0.16, t: Math.random() * 6 };
+    root.scale.setScalar(species.length / 1.6);   // mantle+arms ≈ 1.6 units
+    root.userData.species = species.id;
+    return root;
+  }
+
+  if (shape === 'sunfish') {
+    // Huge disc body, tall dorsal + anal fin, almost no tail.
+    const disc = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), bodyMat);
+    disc.scale.set(0.28, 1, 0.95); root.add(disc);
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), bellyMat);
+    belly.scale.set(0.24, 0.6, 0.85); belly.position.y = -0.12; root.add(belly);
+    // clavus (the blunt rudder replacing a tail)
+    const clavus = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.42, 0.12), finMat);
+    clavus.position.z = -0.36; root.add(clavus);
+    root._fins = [];
+    const dors = new THREE.Mesh(dorsalFin(0.12, 0.5), finMat);
+    dors.material.side = THREE.DoubleSide;
+    dors.position.set(0, 0.3, 0.02); root.add(dors); root._fins.push({ mesh: dors, dir: 1 });
+    const anal = new THREE.Mesh(dorsalFin(0.12, 0.5), finMat);
+    anal.material.side = THREE.DoubleSide;
+    anal.position.set(0, -0.3, 0.02); anal.rotation.z = Math.PI;
+    root.add(anal); root._fins.push({ mesh: anal, dir: -1 });
+    addEyes(root, 0.035, 0.26, 0.09, 0.1);
+    root._anim = { kind: 'sunfin', freq: 0.7, amp: 0.22, t: Math.random() * 6 };
+    root.scale.setScalar(species.length / 0.9);
+    root.userData.species = species.id;
+    return root;
+  }
+
+  if (shape === 'snake') {
+    // Chain of segments that undulate as a travelling sine wave.
+    const segN = 14;
+    root._segs = [];
+    for (let i = 0; i < segN; i++) {
+      const t = i / (segN - 1);
+      const r = 0.055 * (1 - t * 0.45);
+      const useBand = i % 2 === 0;
+      const segMat = useBand && c.band ? mat(c.band) : bodyMat;
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), segMat);
+      seg.scale.set(0.85, 0.75, 1.25);       // laterally flattened body
+      seg.position.z = 0.5 - t * 1.0;
+      root.add(seg);
+      root._segs.push({ mesh: seg, offset: i * 0.55, baseZ: seg.position.z });
+    }
+    // paddle tail
+    const paddle = new THREE.Mesh(caudalFin(0.075, 0.12), finMat);
+    paddle.rotation.z = Math.PI / 2;         // flatten horizontally
+    paddle.position.z = -0.54; root.add(paddle);
+    root._paddle = paddle;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), bodyMat);
+    head.scale.set(0.9, 0.8, 1.3); head.position.z = 0.55; root.add(head);
+    addEyes(head, 0.014, 0.04, 0.035, 0.02);
+    root._anim = { kind: 'undulate', freq: 2.0, amp: 0.1, t: Math.random() * 6 };
+    root.scale.setScalar(species.length);
+    root.userData.species = species.id;
+    return root;
+  }
+
+  if (shape === 'star') {
+    // Five tapered arms radiating from a low central disc.
+    const disc = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 6), bodyMat);
+    disc.scale.set(1, 0.42, 1); root.add(disc);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const arm = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.5, 6), bodyMat);
+      arm.rotation.z = Math.PI / 2;
+      arm.rotation.y = -a;
+      arm.position.set(Math.cos(a) * 0.3, 0.01, Math.sin(a) * 0.3);
+      arm.scale.set(1, 1, 0.45);
+      root.add(arm);
+    }
+    root._anim = { kind: 'still', freq: 0.2, amp: 0.02, t: Math.random() * 6 };
+    root.scale.setScalar(species.length * 2);   // length ~ arm span
+    root.userData.species = species.id;
+    return root;
+  }
+
+  if (shape === 'crab') {
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), bodyMat);
+    shell.scale.set(1.25, 0.55, 0.95); root.add(shell);
+    const under = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), bellyMat);
+    under.scale.set(1.2, 0.3, 0.9); under.position.y = -0.06; root.add(under);
+    // eyes on stalks
+    for (const s of [-1, 1]) {
+      const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.14, 4), bodyMat);
+      stalk.position.set(s * 0.1, 0.18, 0.22); root.add(stalk);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), mat(0x0a0a0a, { rough: 0.3 }));
+      eye.position.set(s * 0.1, 0.26, 0.22); root.add(eye);
+    }
+    // claws + walking legs
+    root._legs = [];
+    for (const s of [-1, 1]) {
+      const claw = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), finMat);
+      claw.scale.set(1.4, 0.7, 0.8);
+      claw.position.set(s * 0.42, -0.02, 0.26);
+      root.add(claw); root._legs.push({ mesh: claw, side: s, phase: 0 });
+      for (let i = 0; i < 3; i++) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.014, 0.34, 4), finMat);
+        leg.rotation.z = s * 1.05;
+        leg.position.set(s * 0.32, -0.1, 0.05 - i * 0.17);
+        root.add(leg); root._legs.push({ mesh: leg, side: s, phase: i * 1.1 });
+      }
+    }
+    root._anim = { kind: 'scuttle', freq: 3.2, amp: 0.12, t: Math.random() * 6 };
+    root.scale.setScalar(species.length * 2.6);  // length ~ carapace width
+    root.userData.species = species.id;
+    return root;
+  }
+
   if (shape === 'ray') {
     // Flat diamond body with big flapping wings and a whip tail.
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), bodyMat);
@@ -141,7 +283,7 @@ export function buildCreature(species) {
   else if (isAngler) { profile = (t) => Math.pow(Math.sin(Math.PI * Math.min(t, 0.9)), 0.6) * (1 - 0.3 * t); maxR = 0.22; }
   else { profile = (t) => Math.pow(Math.sin(Math.PI * t), 0.7); maxR = 0.16; }
 
-  const body = new THREE.Mesh(spindle(1, maxR, profile, 14, isWhale ? 11 : 9), bodyMat);
+  const body = new THREE.Mesh(spindle(1, maxR, profile, 18, isWhale ? 16 : 12), bodyMat);
   root.add(body);
 
   // lighter belly
@@ -234,6 +376,36 @@ export function animateCreature(root, dt, speed01 = 1) {
     root._flippers[1].rotation.x = -0.15 + flap;
     root._flippers[2].rotation.x = -0.15 - flap * 0.6;
     root._flippers[3].rotation.x = -0.15 - flap * 0.6;
+  } else if (a.kind === 'still') {
+    root.position.y += Math.sin(a.t * Math.PI * 2) * a.amp * dt;   // imperceptible cling
+    return;
+  } else if (a.kind === 'scuttle' && root._legs) {
+    for (const l of root._legs) {
+      l.mesh.position.y += Math.sin(a.t * Math.PI * 2 + l.phase) * a.amp * dt;
+    }
+    return;
+  } else if (a.kind === 'jet' && root._arms) {
+    // squid: arms trail and ripple behind the mantle
+    for (const arm of root._arms) {
+      arm.mesh.rotation.z = Math.sin(a.t * Math.PI * 2 + arm.phase) * a.amp;
+      arm.mesh.rotation.x = Math.PI / 2 + Math.cos(a.t * Math.PI * 2 + arm.phase) * a.amp * 0.5;
+    }
+    return;
+  } else if (a.kind === 'sunfin' && root._fins) {
+    // sunfish: dorsal and anal fins scull in opposition
+    for (const f of root._fins) {
+      f.mesh.rotation.y = Math.sin(a.t * Math.PI * 2) * a.amp * f.dir;
+    }
+    return;
+  } else if (a.kind === 'undulate' && root._segs) {
+    // sea snake: travelling sine wave down the body
+    for (const s of root._segs) {
+      s.mesh.position.x = Math.sin(a.t * Math.PI * 2 - s.offset) * a.amp;
+    }
+    if (root._paddle) {
+      root._paddle.position.x = Math.sin(a.t * Math.PI * 2 - root._segs.length * 0.55) * a.amp * 1.2;
+    }
+    return;
   } else if (a.kind === 'wings' && root._wings) {
     for (const w of root._wings) {
       w.mesh.rotation.z = w.side * s * a.amp;      // graceful manta wingbeat

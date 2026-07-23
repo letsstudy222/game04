@@ -122,6 +122,26 @@ body {
 .hud-line { display: flex; justify-content: space-between; gap: 18px; padding: 3px 0; }
 .hud-k { color: var(--slate); text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.14em; }
 .hud-v { color: var(--foam); font-weight: 500; }
+.hud-horizon {
+  position: relative; height: 44px; margin: 10px 0 4px;
+  border: 1px solid var(--hair); border-radius: 8px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(87,227,201,0.05), rgba(4,20,29,0.3));
+}
+.hz-line {
+  position: absolute; left: 8%; right: 8%; top: 50%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--bio), transparent);
+  transition: transform 0.08s linear;
+}
+.hz-center {
+  position: absolute; left: 50%; top: 50%; width: 16px; height: 1px;
+  transform: translate(-50%, -50%); background: var(--foam); opacity: 0.85;
+}
+.hz-center::before, .hz-center::after {
+  content: ''; position: absolute; top: -2px; width: 1px; height: 5px; background: var(--foam);
+}
+.hz-center::before { left: 0; }
+.hz-center::after { right: 0; }
+
 .hud-compass {
   position: relative; width: 42px; height: 42px; margin: 10px auto 2px;
   border: 1px solid var(--hair); border-radius: 50%;
@@ -133,9 +153,25 @@ body {
 }
 .compass-n { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--bio); }
 
+/* ---------- Minimap ---------- */
+#minimap {
+  position: fixed; top: 18px; right: 18px; z-index: 11;
+  width: 148px; height: 148px; border-radius: 18px; overflow: hidden;
+  border: 1px solid var(--hair);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  background: var(--abyss);
+}
+#minimap canvas { display: block; width: 100%; height: 100%; }
+.mm-n {
+  position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  color: var(--bio); text-shadow: 0 0 6px rgba(4, 20, 29, 0.9);
+  pointer-events: none;
+}
+
 /* ---------- Sound toggle ---------- */
 .sound-btn {
-  position: fixed; top: 18px; right: 18px; z-index: 12;
+  position: fixed; top: 178px; right: 18px; z-index: 12;
   width: 42px; height: 42px; border-radius: 50%;
   background: var(--panel); backdrop-filter: blur(6px);
   border: 1px solid var(--hair); color: var(--foam);
@@ -232,6 +268,72 @@ body {
   transition: background 0.15s ease;
 }
 #seed-btn:hover { background: rgba(87, 227, 201, 0.2); }
+
+/* ---------- Encyclopedia ---------- */
+.e-inner {
+  width: min(900px, 94vw); max-height: 84vh;
+  display: grid; grid-template-columns: 244px 1fr; gap: 0;
+  background: var(--panel); backdrop-filter: blur(12px);
+  border: 1px solid var(--hair); border-radius: 20px; overflow: hidden;
+}
+.e-sidebar {
+  border-right: 1px solid var(--hair); padding: 22px 16px;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.e-count { font-size: 11.5px; color: var(--slate); margin: 8px 0 14px; }
+.e-list { overflow-y: auto; display: flex; flex-direction: column; gap: 3px; min-height: 0; }
+.e-row {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: none; border: 1px solid transparent; border-radius: 9px;
+  padding: 8px 10px; cursor: pointer; text-align: left;
+  color: var(--foam); font-family: inherit; font-size: 13px;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.e-row:hover:not(:disabled) { background: rgba(255,255,255,0.05); }
+.e-row.active { background: rgba(87,227,201,0.1); border-color: rgba(87,227,201,0.4); }
+.e-row.locked { color: var(--slate); cursor: default; letter-spacing: 0.18em; }
+.e-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid; flex: 0 0 8px; }
+.e-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.e-row-size { font-size: 11px; color: var(--slate); }
+
+.e-detail { padding: 26px 28px; overflow-y: auto; min-height: 0; }
+.e-biome { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; }
+.e-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 30px; margin: 8px 0 4px; }
+.e-sci { color: var(--slate); font-size: 12.5px; margin-bottom: 12px; }
+.e-status {
+  display: inline-block; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  border: 1px solid; border-radius: 999px; padding: 4px 11px; font-weight: 700;
+}
+.e-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 18px 0 14px; }
+.e-stat {
+  background: rgba(255,255,255,0.03); border: 1px solid var(--hair);
+  border-radius: 10px; padding: 9px 12px; display: flex; flex-direction: column; gap: 2px;
+}
+.e-stat span { font-size: 10px; color: var(--slate); text-transform: uppercase; letter-spacing: 0.12em; }
+.e-stat b { font-size: 14px; color: var(--foam); font-weight: 600; }
+.e-diet { font-size: 12.5px; color: #b9d2d8; margin-bottom: 14px; }
+.e-diet span { color: var(--slate); text-transform: uppercase; font-size: 10px; letter-spacing: 0.12em; margin-right: 6px; }
+.e-body { font-size: 13.5px; line-height: 1.65; color: #cfe0e5; margin-bottom: 12px; }
+.e-record, .e-habitat { font-size: 12.5px; line-height: 1.55; color: var(--slate); margin-bottom: 8px; }
+.e-record b, .e-habitat b { color: var(--bio); font-weight: 600; }
+.e-locked { text-align: center; padding: 60px 20px; color: var(--slate); }
+.e-locked-mark { font-family: 'Fraunces', serif; font-size: 64px; color: var(--hair); margin-bottom: 12px; }
+.e-locked-hint { font-size: 12.5px; margin-top: 8px; }
+.e-locked-hint b { color: var(--bio); }
+.e-hint { text-align: center; color: var(--slate); font-size: 12px; margin-top: 14px; }
+.e-hint b { color: var(--foam); }
+
+#density-select {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--hair);
+  border-radius: 10px; color: var(--foam); padding: 9px 12px;
+  font-family: inherit; font-size: 13px; cursor: pointer; outline: none;
+}
+#density-select:focus { border-color: var(--bio); }
+
+@media (max-width: 720px) {
+  .e-inner { grid-template-columns: 1fr; max-height: 88vh; }
+  .e-sidebar { border-right: none; border-bottom: 1px solid var(--hair); max-height: 200px; }
+}
 
 /* ---------- Achievements ---------- */
 .j-achs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }

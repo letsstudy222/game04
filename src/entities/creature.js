@@ -27,6 +27,24 @@ export class Creature {
   }
 
   update(dt, getFloorY, playerInfo = null) {
+    // --- benthic life (starfish, crabs): cling to the seafloor, crawl slowly ---
+    if (this.species.benthic) {
+      this.wanderTimer -= dt;
+      if (this.wanderTimer <= 0) {
+        this.wanderTimer = 4 + Math.random() * 6;
+        this._crawlDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+      }
+      if (this._crawlDir) this.mesh.position.addScaledVector(this._crawlDir, this.speed * dt);
+      const fy = getFloorY(this.mesh.position.x, this.mesh.position.z);
+      this.mesh.position.y = fy + this.species.length * 0.35;
+      if (this._crawlDir) {
+        _tmp.copy(this.mesh.position).add(this._crawlDir);
+        this.mesh.lookAt(_tmp);
+      }
+      animateCreature(this.mesh, dt, 0.4);
+      return;
+    }
+
     // --- react to the player ---
     let fleeing = false;
     if (playerInfo) {

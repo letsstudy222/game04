@@ -1,7 +1,7 @@
 // main.js — Bootstraps the whole game and runs the loop.
 
 import * as THREE from 'three';
-import { CONFIG } from './config.js';
+import { CONFIG, applyDensity } from './config.js';
 import { Input } from './core/input.js';
 import { OceanAudio } from './core/audio.js';
 import { Ocean } from './world/ocean.js';
@@ -13,6 +13,8 @@ import { HUD } from './ui/hud.js';
 import { Journal, ACHIEVEMENTS } from './core/journal.js';
 import { Toasts } from './ui/toast.js';
 import { renderJournal } from './ui/journalPanel.js';
+import { Minimap } from './ui/minimap.js';
+import { renderEncyclopedia } from './ui/encyclopedia.js';
 import { BIOME_DEF } from './world/biomes.js';
 import { SPECIES_ORDER } from './data/species.js';
 
@@ -33,6 +35,9 @@ const loadingEl = document.getElementById('loading');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+// Filmic tone mapping: rolls highlights off gently -> much softer look
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
@@ -60,6 +65,12 @@ const journal = new Journal();
 const toasts = new Toasts(document.getElementById('toasts'));
 const journalEl = document.getElementById('journal');
 const journalBody = document.getElementById('journal-body');
+const minimapEl = document.getElementById('minimap');
+const encycEl = document.getElementById('encyclopedia');
+const minimap = new Minimap(
+  document.getElementById('minimap-canvas'),
+  (x, z) => chunks.getBiome(x, z)
+);
 
 // --- menu wiring (rebuilt on each visit so ✓ badges stay fresh) ---
 function rebuildMenu() {
@@ -105,6 +116,8 @@ function startGame(speciesId) {
 
     loadingEl.classList.add('hidden');
     hudEl.classList.remove('hidden');
+    minimapEl.classList.remove('hidden');
+    minimap.invalidate();
     hintEl.classList.remove('hidden');
     setTimeout(() => hintEl.classList.add('fade'), 6000);
     state = 'playing';
@@ -126,9 +139,11 @@ function returnToMenu() {
   if (player) { scene.remove(player.mesh); player = null; }
   chunks.clearAll();
   hudEl.classList.add('hidden');
+  minimapEl.classList.add('hidden');
   hintEl.classList.add('hidden');
   hintEl.classList.remove('fade');
   journalEl.classList.add('hidden');
+  encycEl.classList.add('hidden');
   rebuildMenu();
   menuEl.classList.remove('hidden');
   document.exitPointerLock?.();
@@ -143,6 +158,7 @@ function applySeed() {
   if (v === CONFIG.seed) return;
   CONFIG.seed = v;
   chunks.setSeed(v);
+  minimap.invalidate();
   chunks.primeAround(new THREE.Vector3(0, -8, 0));   // rebuild menu backdrop
   try {
     history.replaceState(null, '', location.pathname + '?seed=' + encodeURIComponent(v));
@@ -151,6 +167,28 @@ function applySeed() {
 }
 seedBtn.addEventListener('click', applySeed);
 seedInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySeed(); });
+
+// --- encyclopedia (key E) ---
+function drawEncyc() { renderEncyclopedia(encycEl, journal, drawEncyc); }
+function toggleEncyc() {
+  if (encycEl.classList.contains('hidden')) {
+    drawEncyc();
+    encycEl.classList.remove('hidden');
+  } else {
+    encycEl.classList.add('hidden');
+  }
+}
+encycEl.addEventListener('click', (e) => { if (e.target === encycEl) toggleEncyc(); });
+
+// --- creature density selector ---
+const densitySel = document.getElementById('density-select');
+densitySel.addEventListener('change', () => {
+  applyDensity(densitySel.value);
+  chunks.clearAll();
+  minimap.invalidate();
+  chunks.primeAround(new THREE.Vector3(0, -8, 0));
+  toasts.show(`🐠 Mật độ sinh vật: <b>${densitySel.options[densitySel.selectedIndex].text}</b>`);
+});
 
 // --- journal panel (key J) ---
 function toggleJournal() {
@@ -167,6 +205,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM' && (state === 'playing' || state === 'photo')) returnToMenu();
   if (e.code === 'KeyB') toggleSound();
   if (e.code === 'KeyJ') toggleJournal();
+  if (e.code === 'KeyE') toggleEncyc();
 });
 
 // --- ambient sound ---
@@ -198,7 +237,8 @@ function adaptQuality(dt) {
     renderer.setPixelRatio(1);                    // cheapest big win
   } else if (fps < 30 && qualityTier === 1) {
     qualityTier = 0;
-    CONFIG.chunk.renderRadius = 2;                // shrink streamed area 7x7 -> 5x5
+    CONFIG.chunk.renderRadius = Math.min(CONFIG.chunk.renderRadius, 2);
+    CONFIG.perf.maxCreatures = Math.min(CONFIG.perf.maxCreatures, 80);
     chunks._lastChunk = null;                     // force ring rebuild
   }
 }
@@ -218,10 +258,12 @@ window.addEventListener('keydown', (e) => {
   if (state === 'playing') {
     state = 'photo';
     hudEl.classList.add('hidden');
+    minimapEl.classList.add('hidden');
     hintEl.classList.add('hidden');
   } else if (state === 'photo') {
     state = 'playing';
     hudEl.classList.remove('hidden');
+    minimapEl.classList.remove('hidden');
   }
 });
 
@@ -274,8 +316,8 @@ function animate() {
   if (dt > 0) adaptQuality(dt);
 
   const daylight = daylightAt(time);
-  sun.intensity = 0.12 + 1.0 * daylight;
-  hemi.intensity = 0.22 + 0.5 * daylight;
+  sun.intensity = 0.12 + 0.82 * daylight;      // gentler direct sun
+  hemi.intensity = 0.3 + 0.55 * daylight;      // more ambient fill -> softer shadows
 
   if (state === 'playing' && player) {
     player.update(dt, (x, z) => chunks.getFloorY(x, z));
@@ -284,7 +326,8 @@ function animate() {
     const playerInfo = { pos, length: player.species.length, id: player.species.id };
     chunks.update(dt, time, pos, playerInfo);
     ocean.update(dt, time, pos, biome, daylight);
-    hud.update(pos, biome, player.yaw);
+    hud.update(pos, biome, player.yaw, player.pitch);
+    minimap.update(pos, player.yaw);
     checkDiscoveries(dt, pos, biome);
   } else if (state === 'photo' && player) {
     // slow cinematic orbit around the fish

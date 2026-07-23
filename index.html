@@ -38,12 +38,20 @@
       </header>
       <div id="menu-cards"></div>
       <div class="seed-row">
+        <label for="density-select" class="seed-lbl">Mật độ sinh vật</label>
+        <select id="density-select">
+          <option value="low">Thấp — máy yếu</option>
+          <option value="medium" selected>Vừa</option>
+          <option value="high">Cao — máy khỏe</option>
+        </select>
+      </div>
+      <div class="seed-row">
         <label for="seed-input" class="seed-lbl">Seed thế giới</label>
         <input id="seed-input" maxlength="32" spellcheck="false" autocomplete="off" />
         <button id="seed-btn">Tạo thế giới mới</button>
       </div>
       <footer class="menu-foot">
-        Điều khiển: <b>W</b> bơi tới · <b>A/D</b> hoặc chuột để rẽ · <b>Space</b> lên · <b>C</b> xuống · <b>Shift</b> tăng tốc · <b>B</b> âm thanh · <b>P</b> chụp ảnh · <b>J</b> nhật ký · <b>M</b> đổi loài
+        Điều khiển: <b>W</b> bơi tới · <b>A/D</b> hoặc chuột để rẽ · <b>Space</b> lên · <b>C</b> xuống · <b>Shift</b> tăng tốc · <b>B</b> âm thanh · <b>P</b> chụp ảnh · <b>J</b> nhật ký · <b>E</b> bách khoa · <b>M</b> đổi loài
       </footer>
     </div>
   </div>
@@ -53,7 +61,13 @@
 
   <!-- Controls hint -->
   <div id="hint" class="hidden">
-    Nhấp chuột để khoá con trỏ &amp; nhìn tự do · <b>W</b> bơi · <b>Shift</b> tăng tốc · <b>B</b> âm thanh · <b>P</b> chụp ảnh · <b>J</b> nhật ký · <b>M</b> đổi loài
+    Nhấp chuột để khoá con trỏ &amp; nhìn tự do · <b>W</b> bơi · <b>Shift</b> tăng tốc · <b>B</b> âm thanh · <b>P</b> chụp ảnh · <b>J</b> nhật ký · <b>E</b> bách khoa · <b>M</b> đổi loài
+  </div>
+
+  <!-- World minimap -->
+  <div id="minimap" class="hidden">
+    <canvas id="minimap-canvas" width="148" height="148"></canvas>
+    <span class="mm-n">N</span>
   </div>
 
   <!-- Ambient sound toggle -->
@@ -61,6 +75,9 @@
 
   <!-- Discovery toasts -->
   <div id="toasts"></div>
+
+  <!-- Encyclopedia (key E) -->
+  <div id="encyclopedia" class="overlay center hidden"></div>
 
   <!-- Field journal (key J) -->
   <div id="journal" class="overlay center hidden">

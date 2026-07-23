@@ -38,7 +38,7 @@ export const CONFIG = {
   },
 
   perf: {
-    maxCreatures: 90,       // hard cap on simultaneous NPC creatures
+    maxCreatures: 150,      // hard cap on simultaneous NPC creatures
     plankton: 1400,         // ambient drifting particle count
     godRays: 14,            // number of light shafts near surface
   },
@@ -49,6 +49,22 @@ export const CONFIG = {
 export function cruiseFor(species) {
   const sizeScale = Math.min(1.2, Math.max(0.15, Math.sqrt(species.length) / 1.5));
   return CONFIG.player.baseSpeed * species.speedFactor * sizeScale;
+}
+
+// Creature-density presets the player can pick in the menu. The adaptive
+// quality system can still step this down automatically on a slow machine.
+export const DENSITY = {
+  low:    { maxCreatures: 70,  plankton: 900,  renderRadius: 2 },
+  medium: { maxCreatures: 150, plankton: 1400, renderRadius: 3 },
+  high:   { maxCreatures: 240, plankton: 2000, renderRadius: 3 },
+};
+
+export function applyDensity(level) {
+  const d = DENSITY[level] || DENSITY.medium;
+  CONFIG.perf.maxCreatures = d.maxCreatures;
+  CONFIG.perf.plankton = d.plankton;
+  CONFIG.chunk.renderRadius = d.renderRadius;
+  return d;
 }
 
 // Real-world-ish depth zones. Used for biome blending + HUD labels.

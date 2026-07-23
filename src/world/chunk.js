@@ -19,14 +19,14 @@ function makeCoral(accent) {
   const n = 3 + Math.floor(Math.random() * 4);
   for (let i = 0; i < n; i++) {
     const col = palette[Math.floor(Math.random() * palette.length)];
-    const m = new THREE.MeshStandardMaterial({ color: col, flatShading: true, roughness: 0.9 });
+    const m = new THREE.MeshStandardMaterial({ color: col, flatShading: false, roughness: 0.9 });
     const h = 0.6 + Math.random() * 1.8;
     const branch = new THREE.Mesh(new THREE.ConeGeometry(0.12 + Math.random() * 0.15, h, 5), m);
     branch.position.set((Math.random() - 0.5) * 0.9, h / 2, (Math.random() - 0.5) * 0.9);
     branch.rotation.z = (Math.random() - 0.5) * 0.5;
     g.add(branch);
     if (Math.random() > 0.5) {
-      const bulb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18 + Math.random() * 0.2, 0), m);
+      const bulb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18 + Math.random() * 0.2, 1), m);
       bulb.position.copy(branch.position).y = h * 0.9;
       g.add(bulb);
     }
@@ -36,7 +36,7 @@ function makeCoral(accent) {
 
 function makeKelp() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x3f7a3a, flatShading: true, roughness: 0.9, side: THREE.DoubleSide });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x3f7a3a, flatShading: false, roughness: 0.9, side: THREE.DoubleSide });
   const strands = 2 + Math.floor(Math.random() * 3);
   for (let s = 0; s < strands; s++) {
     const h = 4 + Math.random() * 8;
@@ -55,9 +55,9 @@ function makeKelp() {
 
 function makeRock() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x5a6068, flatShading: true, roughness: 1 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x5a6068, flatShading: false, roughness: 1 });
   const r = 0.8 + Math.random() * 2.2;
-  const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat);
+  const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat);
   rock.scale.set(1, 0.6 + Math.random() * 0.5, 1);
   rock.position.y = r * 0.3;
   g.add(rock);
@@ -66,9 +66,9 @@ function makeRock() {
 
 function makeIce() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xdfeefb, flatShading: true, roughness: 0.4, metalness: 0.1, transparent: true, opacity: 0.9 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xdfeefb, flatShading: false, roughness: 0.4, metalness: 0.1, transparent: true, opacity: 0.9 });
   const r = 1.5 + Math.random() * 3;
-  const berg = new THREE.Mesh(new THREE.OctahedronGeometry(r, 0), mat);
+  const berg = new THREE.Mesh(new THREE.OctahedronGeometry(r, 1), mat);
   berg.scale.set(1, 1.4, 1);
   berg.position.y = r * 0.4;
   berg.rotation.y = Math.random() * Math.PI;
@@ -78,7 +78,7 @@ function makeIce() {
 
 function makeVent() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x25201e, flatShading: true, roughness: 1 });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x25201e, flatShading: false, roughness: 1 });
   const h = 2 + Math.random() * 3;
   const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.9, h, 6), mat);
   chimney.position.y = h / 2;
@@ -94,7 +94,7 @@ function makeJelly() {
   const bellMat = new THREE.MeshStandardMaterial({
     color: 0x7fe8ff, transparent: true, opacity: 0.5,
     emissive: 0x2fb6c9, emissiveIntensity: 1.1,
-    roughness: 0.4, flatShading: true, side: THREE.DoubleSide,
+    roughness: 0.4, flatShading: false, side: THREE.DoubleSide,
   });
   const bell = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), bellMat);
@@ -110,10 +110,66 @@ function makeJelly() {
   return g;
 }
 
+// Tall rock spire — a landmark you can navigate by.
+function makeSpire() {
+  const g = new THREE.Group();
+  const m = new THREE.MeshStandardMaterial({ color: 0x4a5560, flatShading: false, roughness: 1 });
+  const h = 22 + Math.random() * 30;
+  const seg = 4 + Math.floor(Math.random() * 3);
+  let y = 0, r = 3.2 + Math.random() * 1.8;
+  for (let i = 0; i < seg; i++) {
+    const sh = h / seg;
+    const chunk = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r, sh, 7), m);
+    chunk.position.set((Math.random() - 0.5) * 1.2, y + sh / 2, (Math.random() - 0.5) * 1.2);
+    chunk.rotation.y = Math.random() * Math.PI;
+    g.add(chunk);
+    y += sh * 0.94;
+    r *= 0.66;
+  }
+  // a few ledges
+  for (let i = 0; i < 3; i++) {
+    const ledge = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 + Math.random(), 1), m);
+    ledge.scale.set(1.5, 0.4, 1.5);
+    ledge.position.set((Math.random() - 0.5) * 4, h * (0.25 + Math.random() * 0.6), (Math.random() - 0.5) * 4);
+    g.add(ledge);
+  }
+  return g;
+}
+
+// Rock arch / cave mouth you can swim through.
+function makeArch() {
+  const g = new THREE.Group();
+  const m = new THREE.MeshStandardMaterial({ color: 0x44505c, flatShading: false, roughness: 1 });
+  const span = 12 + Math.random() * 10;
+  const height = 9 + Math.random() * 7;
+  // two legs
+  for (const s of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3.4, height, 7), m);
+    leg.position.set(s * span / 2, height / 2, 0);
+    leg.rotation.z = -s * 0.09;
+    g.add(leg);
+  }
+  // curved top made of blocks
+  const steps = 7;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const a = Math.PI * t;
+    const block = new THREE.Mesh(new THREE.BoxGeometry(span / steps * 1.5, 2.6, 5.2), m);
+    block.position.set(
+      -Math.cos(a) * span / 2,
+      height + Math.sin(a) * 3.4,
+      0
+    );
+    block.rotation.z = -Math.cos(a) * 0.5;
+    g.add(block);
+  }
+  return g;
+}
+
 function makeWreck() {
   const g = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color: 0x3d3229, flatShading: true, roughness: 1 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x2a231d, flatShading: true, roughness: 1 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x3d3229, flatShading: false, roughness: 1 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a231d, flatShading: false, roughness: 1 });
   // hull: tapered box lying tilted on the seafloor
   const hull = new THREE.Mesh(new THREE.BoxGeometry(4.5, 3, 14), wood);
   hull.position.y = 1.2;
@@ -180,7 +236,7 @@ export function buildChunk(noise, cx, cz) {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 });
+  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.95 });
   const terrain = new THREE.Mesh(geo, terrainMat);
   terrain.position.set(originX, 0, originZ);
 
@@ -201,6 +257,29 @@ export function buildChunk(noise, cx, cz) {
     const s = 0.7 + seededRand(wz, wx) * 0.8;
     d.scale.setScalar(s);
     decor.add(d);
+  }
+
+  // Landmarks: rock spires (~12%) and swim-through arches (~8%).
+  // These give the open water a sense of place and scale.
+  {
+    const rSpire = seededRand(originX * 0.31 + 3, originZ * 0.77 - 8);
+    if (rSpire < 0.12 && centerBiome !== 'polar') {
+      const rx = (seededRand(originX + 41, originZ + 17) - 0.5) * size * 0.6;
+      const rz = (seededRand(originX - 23, originZ + 61) - 0.5) * size * 0.6;
+      const sp = makeSpire();
+      sp.position.set(rx, floorHeightAt(noise, originX + rx, originZ + rz), rz);
+      sp.rotation.y = seededRand(rx, rz) * Math.PI * 2;
+      decor.add(sp);
+    }
+    const rArch = seededRand(originX * 0.53 - 19, originZ * 0.29 + 7);
+    if (rArch < 0.08 && (centerBiome === 'coral_reef' || centerBiome === 'kelp_forest' || centerBiome === 'open_ocean')) {
+      const rx = (seededRand(originX + 88, originZ - 44) - 0.5) * size * 0.5;
+      const rz = (seededRand(originX - 66, originZ + 22) - 0.5) * size * 0.5;
+      const ar = makeArch();
+      ar.position.set(rx, floorHeightAt(noise, originX + rx, originZ + rz), rz);
+      ar.rotation.y = seededRand(rz, rx) * Math.PI * 2;
+      decor.add(ar);
+    }
   }
 
   // Rare shipwreck resting on the open/deep seafloor (~6% of chunks there).

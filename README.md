@@ -1,8 +1,8 @@
 # 🌊 ABYSSAL — Mô phỏng thế giới đại dương
 
-Game khám phá đại dương thư giãn, chạy thẳng trong trình duyệt bằng **Three.js**, không cần cài đặt hay build. Bơi tự do trong một thế giới **procedural vô hạn kiểu Minecraft** — vùng biển sinh ra theo mỗi cú bơi của bạn, các biome (rạn san hô, rừng tảo bẹ, biển khơi, vùng cực, biển sâu) nối liền mạch như đại dương thật. Chọn 1 trong 8 loài (tỉ lệ thật) và lặn xuống.
+Game khám phá đại dương thư giãn, chạy thẳng trong trình duyệt bằng **Three.js**, không cần cài đặt hay build. Bơi tự do trong một thế giới **procedural vô hạn kiểu Minecraft** — vùng biển sinh ra theo mỗi cú bơi của bạn, các biome (rạn san hô, rừng tảo bẹ, biển khơi, vùng cực, biển sâu) nối liền mạch như đại dương thật. Chọn 1 trong 12 loài (tỉ lệ thật) và lặn xuống.
 
-Phong cách đồ họa: **low-poly nghệ thuật** (kiểu ABZÛ) — nhẹ, mượt, cá dựng hoàn toàn bằng geometry thủ tục nên repo không cần file model nào.
+Phong cách đồ họa: **low-poly mềm mại** (kiểu ABZÛ) — smooth shading + filmic tone mapping, nhẹ và mượt, cá dựng hoàn toàn bằng geometry thủ tục nên repo không cần file model nào.
 
 ---
 
@@ -61,6 +61,7 @@ Xong. Mỗi lần `git push` mới, trang tự cập nhật.
 | **B** hoặc nút 🔇 | Bật/tắt âm thanh đại dương |
 | **P** | Chế độ chụp ảnh (ẩn UI, camera quay quanh cá) |
 | **J** | Mở/đóng Nhật ký thám hiểm |
+| **E** | Mở/đóng Bách khoa toàn thư |
 | **M** | Về menu đổi loài |
 
 ---
@@ -77,7 +78,7 @@ src/
     noise.js          # Noise thủ tục tự chứa (Perlin/fBm) — quyết định địa hình & biome, có seed nên tái tạo giống hệt
     input.js          # Bàn phím + chuột (pointer lock)
   data/
-    species.js        # ⭐ Dữ liệu 8 loài: kích thước thật, biome, độ sâu, màu, thông tin
+    species.js        # ⭐ Dữ liệu 15 loài: kích thước thật, biome, độ sâu, màu, mục bách khoa
   world/
     biomes.js         # Ánh xạ toạ độ → biome; độ cao đáy biển; cấu hình màu/độ sâu mỗi biome
     chunk.js          # Dựng 1 chunk: lưới đáy biển + trang trí (san hô/tảo/đá/băng/miệng phun) + điểm spawn
@@ -111,6 +112,14 @@ Tất cả nằm trong `src/config.js`: `chunk.renderRadius` (tầm nhìn — gi
 ---
 
 ## ✨ Có gì trong thế giới
+- **Bách khoa toàn thư** (`E`): mục tra cứu cho cả 15 loài với **số liệu thật** — cân nặng, tuổi thọ, thức ăn, dải độ sâu, kỷ lục, và **trạng thái bảo tồn IUCN** có màu (Ít lo ngại → Cực kỳ nguy cấp). Mỗi loài có một đoạn viết về tập tính và sinh học. Loài chưa gặp bị khoá kèm gợi ý nơi tìm.
+- **12 loài chơi được**, trong đó 4 loài mới: **mực khổng lồ** (12 m, 8 tay + 2 xúc tu săn mồi, biển sâu), **cá mặt trăng** (thân đĩa khổng lồ, vây lưng và hậu môn chèo ngược nhau), **cá heo chuột vaquita** (loài thú biển hiếm nhất hành tinh — CR), **rắn biển vằn** (thân 14 đốt lượn sóng, đuôi bè như mái chèo).
+- **Chọn mật độ sinh vật** ngay trong menu: Thấp (70) / Vừa (150) / Cao (240 sinh vật cùng lúc).
+- **Điều khiển kiểu ABZÛ, chống chóng mặt:** chuột lái hướng bơi trực tiếp; camera bám theo có độ trễ mềm và **chỉ nghiêng 60% theo góc ngẩng** nên chân trời luôn ổn định; thân cá nghiêng nhẹ theo *tốc độ rẽ* rồi **tự cân bằng về 0**; góc ngẩng giới hạn ±60°; camera không bao giờ xoay nghiêng. Thêm **chỉ báo chân trời** trong HUD.
+- **Sinh vật nhỏ làm biển sống động:** đàn cá con rạn san hô (14–26 con lơ lửng trên nhánh san hô), **sao biển** và **cua đá** bò sát đáy biển (benthic — bám nền, không bơi lơ lửng).
+- **Địa hình mốc:** **cột đá** cao 22–52 m vươn lên từ đáy (~12% chunk) và **vòm đá** bơi xuyên qua được (~8% chunk) — dùng làm mốc định hướng khi khám phá.
+- **Minimap thế giới** góc trên phải: bản đồ màu các vùng biển xung quanh (san hô vàng cát, tảo bẹ xanh lục, biển khơi xanh dương, vùng cực xám băng, biển sâu tối), mũi tên phát sáng chỉ hướng bạn đang bơi, hướng Bắc luôn ở trên.
+- **Hình ảnh mềm mại:** smooth shading toàn bộ (địa hình, sinh vật, san hô), ACES filmic tone mapping cho màu chuyển êm như phim, ánh sáng môi trường dày hơn để bóng đổ dịu.
 - **Đại dương phản ứng với bạn:** chơi cá mập trắng → cá nhỏ và cả đàn cá dạt ra bỏ chạy (tăng tốc gấp đôi); bơi loài hiền lành → cá heo tò mò lượn theo bạn. Cá voi điềm nhiên không quan tâm, cá cần câu rình mồi đứng im.
 - **Chia sẻ thế giới bằng seed:** đổi seed trong menu hoặc mở link `?seed=tên-bất-kỳ` — cùng seed là cùng một đại dương, gửi link cho bạn bè để khám phá chung bản đồ.
 - **4 danh hiệu:** Nhà hải dương học (đủ mọi loài), Người vẽ hải đồ (đủ 5 vùng), Thợ săn xác tàu, Chạm vực thẳm (sâu quá 500 m) — lưu vĩnh viễn, xem trong Nhật ký (`J`).
