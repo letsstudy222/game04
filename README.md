@@ -112,6 +112,10 @@ Tất cả nằm trong `src/config.js`: `chunk.renderRadius` (tầm nhìn — gi
 ---
 
 ## ✨ Có gì trong thế giới
+- **Mô hình 3D theo giải phẫu thật:** mỗi loài có đường viền thân (profile) dựng từ tỉ lệ cơ thể thật, không dùng khuôn chung. Cá voi xanh có **rãnh bụng (ventral pleats)**, mõm bẹt hình chữ U, lỗ thở kèm gờ chắn nước, vây lưng nhỏ đặt lùi 72% thân, đuôi hai thùy có khía giữa. Cá mập trắng có **5 khe mang**, hàm răng nhọn, đuôi lưỡi liềm lệch. Cá heo có **melon** (trán tròn) và mỏ; vaquita có quầng mắt đen đặc trưng. Mực khổng lồ có 8 tay + 2 xúc tu nhiều đốt uốn lượn.
+- **Ngụy trang phản bóng (countershading):** mọi loài đậm màu ở lưng, nhạt dần xuống bụng — bằng vertex color, không tốn texture.
+- **Thân dẹt hai bên đúng thật:** cá không có tiết diện tròn; cá hề rộng 5,5cm × cao 6,3cm.
+- **Cảm giác đồ sộ đã sửa:** trước đây camera lùi *tỉ lệ thuận* với kích thước loài nên **mọi loài đều chiếm 30–33% khung hình như nhau** — đó là lý do cá voi 28m trông chẳng khác cá nhỏ. Nay camera lùi theo `length^0.72`: cá voi **tràn 118% khung hình**, mực 89%, cá hề chỉ 6%. FOV cũng nới rộng theo tốc độ.
 - **Bách khoa toàn thư** (`E`): mục tra cứu cho cả 15 loài với **số liệu thật** — cân nặng, tuổi thọ, thức ăn, dải độ sâu, kỷ lục, và **trạng thái bảo tồn IUCN** có màu (Ít lo ngại → Cực kỳ nguy cấp). Mỗi loài có một đoạn viết về tập tính và sinh học. Loài chưa gặp bị khoá kèm gợi ý nơi tìm.
 - **12 loài chơi được**, trong đó 4 loài mới: **mực khổng lồ** (12 m, 8 tay + 2 xúc tu săn mồi, biển sâu), **cá mặt trăng** (thân đĩa khổng lồ, vây lưng và hậu môn chèo ngược nhau), **cá heo chuột vaquita** (loài thú biển hiếm nhất hành tinh — CR), **rắn biển vằn** (thân 14 đốt lượn sóng, đuôi bè như mái chèo).
 - **Chọn mật độ sinh vật** ngay trong menu: Thấp (70) / Vừa (150) / Cao (240 sinh vật cùng lúc).

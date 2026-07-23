@@ -39,8 +39,12 @@ export class Player {
     this.camPitch = 0;
 
     this.cruise = cruiseFor(species) * 1.3;
-    this.camDist = species.length * 3 + 0.5;
-    this.camHigh = species.length * 1.1 + 0.2;
+    // Sub-linear camera pull-back (length^0.72). Large animals deliberately
+    // overflow the frame — that overflow IS the feeling of size. Linear
+    // scaling would give every species an identical screen footprint.
+    this.camDist = 2.05 * Math.pow(species.length, 0.72) + 1.15;
+    this.camHigh = 0.42 * Math.pow(species.length, 0.72) + 0.28;
+    this.baseFov = camera.fov;
 
     this._updateCamera(1, true);
   }
@@ -117,6 +121,13 @@ export class Player {
 
     const speed01 = THREE.MathUtils.clamp(this.vel.length() / this.cruise, 0.15, 1);
     animateCreature(this.mesh, dt, speed01);
+
+    // Speed-reactive FOV: subtle, but it sells momentum on big animals.
+    const targetFov = this.baseFov + speed01 * 7;
+    if (Math.abs(this.camera.fov - targetFov) > 0.01) {
+      this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 2.5);
+      this.camera.updateProjectionMatrix();
+    }
 
     this._updateCamera(dt, false);
   }

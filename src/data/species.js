@@ -68,7 +68,7 @@ export const SPECIES = {
     viet: 'Cá ngừ vây xanh',
     scientific: 'Thunnus thynnus',
     length: 2.2,
-    shape: 'fish',
+    shape: 'tuna',
     colors: { body: 0x2f4a6b, band: 0x8fb7d6, fin: 0xd6b23a, belly: 0xe8eef2 },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean'],
@@ -153,7 +153,7 @@ export const SPECIES = {
     viet: 'Cá heo mũi chai',
     scientific: 'Tursiops truncatus',
     length: 2.4,
-    shape: 'whale',             // cetacean: horizontal fluke, up-down stroke
+    shape: 'dolphin',             // cetacean: horizontal fluke, up-down stroke
     colors: { body: 0x7f97a6, band: 0xa9bcc7, fin: 0x5f7482, belly: 0xdfe8ec },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'coral_reef'],
@@ -294,7 +294,7 @@ export const SPECIES = {
     viet: 'Cá heo chuột vaquita',
     scientific: 'Phocoena sinus',
     length: 1.4,
-    shape: 'whale',
+    shape: 'porpoise',
     colors: { body: 0x6e7c86, fin: 0x2b3238, belly: 0xe6ecef },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
