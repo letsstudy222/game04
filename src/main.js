@@ -15,6 +15,7 @@ import { Toasts } from './ui/toast.js';
 import { renderJournal } from './ui/journalPanel.js';
 import { Minimap } from './ui/minimap.js';
 import { buildRig } from './core/lighting.js';
+import { RIG } from './core/lighting.js';
 import { renderEncyclopedia } from './ui/encyclopedia.js';
 import { BIOME_DEF } from './world/biomes.js';
 import { SPECIES_ORDER } from './data/species.js';
@@ -49,6 +50,9 @@ const camera = new THREE.PerspectiveCamera(
 const rig = buildRig(THREE, scene);
 
 const ocean = new Ocean(scene);
+// the water's sun and the scene's key light must be the same direction, or
+// the specular streak on the surface will not line up with the god rays
+ocean.surfaceUniforms.uSunDir.value.set(...RIG.key.dir).normalize();
 const chunks = new ChunkManager(scene);
 const input = new Input(canvas);
 const hud = new HUD(hudEl);
@@ -63,6 +67,7 @@ const journalEl = document.getElementById('journal');
 const journalBody = document.getElementById('journal-body');
 const minimapEl = document.getElementById('minimap');
 const encycEl = document.getElementById('encyclopedia');
+const statsEl = document.getElementById('stats');
 const minimap = new Minimap(
   document.getElementById('minimap-canvas'),
   (x, z) => chunks.getBiome(x, z)
@@ -86,8 +91,11 @@ function findSpawn(species) {
     if (chunks.getBiome(x, z) === target) {
       const floor = chunks.getFloorY(x, z);
       const [dTop, dBot] = species.depth;
-      let y = (dTop + dBot) / 2;
-      y = Math.max(floor + species.length * 2, Math.min(dTop, y));
+      // start comfortably inside the species' range but above the seabed
+      const colTop = Math.min(dTop, -species.length * 0.8);
+      const colBot = Math.max(dBot, floor + species.length * 2.5);
+      let y = colBot > colTop ? colTop : (colTop + colBot) * 0.5;
+      y = Math.max(floor + species.length * 2, Math.min(colTop, y));
       return new THREE.Vector3(x, y, z);
     }
   }
@@ -202,6 +210,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyB') toggleSound();
   if (e.code === 'KeyJ') toggleJournal();
   if (e.code === 'KeyE') toggleEncyc();
+  if (e.code === 'KeyG') statsEl.classList.toggle('hidden');
   if (e.code === 'KeyF' && player && (state === 'playing' || state === 'photo')) {
     const on = player.toggleFirstPerson();
     toasts.show(on ? '👁 Góc nhìn thứ nhất — nhấn <b>F</b> để quay lại'
@@ -228,10 +237,27 @@ window.addEventListener('resize', () => {
 
 // --- adaptive quality: step down if the machine can't hold framerate ---
 let fpsN = 0, fpsT = 0, qualityTier = 2;
+let shownFps = 60, statsT = 0;
+
+function drawStats(dt, pos) {
+  statsT += dt;
+  if (statsT < 0.25 || statsEl.classList.contains('hidden')) return;
+  statsT = 0;
+  const cls = shownFps >= 50 ? 'good' : (shownFps >= 30 ? 'warn' : 'bad');
+  const info = renderer.info;
+  statsEl.innerHTML = `
+    <div>FPS <b class="${cls}">${shownFps.toFixed(0)}</b></div>
+    <div>Tam giác <b>${(info.render.triangles / 1000).toFixed(0)}k</b></div>
+    <div>Lệnh vẽ <b>${info.render.calls}</b></div>
+    <div>Sinh vật <b>${chunks.liveCreatures ?? 0}</b></div>
+    <div>Chunk <b>${chunks.loaded.size}</b></div>
+    <div>Chi tiết đầy đủ <b>${CONFIG.perf.fullDetailCreatures}</b></div>`;
+}
 function adaptQuality(dt) {
   fpsN++; fpsT += dt;
-  if (fpsT < 2) return;
+  if (fpsT < 0.5) return;
   const fps = fpsN / fpsT;
+  shownFps = fps;
   fpsN = 0; fpsT = 0;
   if (fps < 38 && qualityTier === 2) {
     qualityTier = 1;
@@ -329,6 +355,7 @@ function animate() {
     hud.update(pos, biome, player.yaw, player.pitch);
     minimap.update(pos, player.yaw);
     checkDiscoveries(dt, pos, biome);
+    drawStats(dt, pos);
   } else if (state === 'photo' && player) {
     // slow cinematic orbit around the fish
     photoAngle += dt * 0.22;

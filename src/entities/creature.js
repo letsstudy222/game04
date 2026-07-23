@@ -11,7 +11,9 @@ const _fwd = new THREE.Vector3();
 export class Creature {
   constructor(species, pos) {
     this.species = species;
-    this.mesh = buildCreature(species, Math.random());
+    // NPCs never need the player's vertex count; small ones need even less
+    this.mesh = buildCreature(species, Math.random(),
+      species.length >= 2 ? 'med' : 'low');
     this.mesh.position.copy(pos);
     this.speed = cruiseFor(species) * 0.6;
     this.vel = new THREE.Vector3(
@@ -94,8 +96,12 @@ export class Creature {
     if (this.mesh.position.y < floor + this.species.length * 1.2) {
       this.vel.y += this.speed * dt * 1.5;
     }
-    // surface avoidance
-    if (this.mesh.position.y > -this.species.length) {
+    // Surface: air-breathing and surface-basking species are allowed right up
+    // to the waterline; everything else keeps a body length of clearance.
+    const surfaceOK = ['blue_whale', 'dolphin', 'vaquita', 'sea_turtle',
+                       'sea_snake', 'sunfish', 'manta_ray'].includes(this.species.id);
+    const ceiling = surfaceOK ? -this.species.length * 0.12 : -this.species.length;
+    if (this.mesh.position.y > ceiling) {
       this.vel.y -= this.speed * dt * 1.5;
     }
 

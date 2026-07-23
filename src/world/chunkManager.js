@@ -8,6 +8,7 @@ import { buildChunk } from './chunk.js';
 import { floorHeightAt, biomeAt } from './biomes.js';
 import { Creature, Flock } from '../entities/creature.js';
 import { SPECIES } from '../data/species.js';
+import { assignLOD } from '../core/lod.js';
 
 export class ChunkManager {
   constructor(scene) {
@@ -119,6 +120,13 @@ export class ChunkManager {
       }
       this._lastChunk = [pcx, pcz];
     }
+
+    // Rank every creature by distance and hand out detail tiers before the
+    // per-creature updates run. Without this each animal pays the full
+    // deform + normal cost no matter how far away it is.
+    const meshes = [];
+    for (const c of this.allCreatures()) meshes.push(c.mesh);
+    this.liveCreatures = assignLOD(meshes, playerPos, CONFIG.perf.fullDetailCreatures);
 
     // update creatures in loaded chunks
     const floorFn = (x, z) => this.getFloorY(x, z);

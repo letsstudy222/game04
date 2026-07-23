@@ -22,7 +22,8 @@ export class Player {
     this.camera = camera;
     this.input = input;
 
-    this.mesh = buildCreature(species);
+    this.mesh = buildCreature(species, Math.random(), 'high');
+    this.mesh._lod = 0;                 // the one you are looking at is never reduced
     this.mesh.position.copy(startPos);
 
     this.yaw = 0;
@@ -145,11 +146,23 @@ export class Player {
       this.mesh.position.y += (minY - this.mesh.position.y) * Math.min(1, dt * 8);
       if (this.vel.y < 0) this.vel.y *= 0.3;
     }
-    const maxY = -this.species.length * 0.4;
-    if (this.mesh.position.y > maxY) {
-      this.mesh.position.y += (maxY - this.mesh.position.y) * Math.min(1, dt * 8);
-      if (this.vel.y > 0) this.vel.y *= 0.3;
+    // Surface: a whale, dolphin or turtle must be able to reach the top and
+    // break the water, so the old hard ceiling at -0.4 body lengths is gone.
+    // The body may rise until its back is just proud of the surface; drag
+    // increases sharply in the last body-depth so it feels like breaking out.
+    const backY = this.species.length * 0.12;      // half body depth, roughly
+    const maxY = backY * 0.55;                     // back clears the waterline
+    if (this.mesh.position.y > -backY) {
+      const over = (this.mesh.position.y + backY) / (maxY + backY);
+      if (this.vel.y > 0) this.vel.y *= (1 - Math.min(0.85, over * 0.9));
     }
+    if (this.mesh.position.y > maxY) {
+      // Firm ceiling. A soft pull alone lost the race against upward thrust,
+      // letting the body climb past the limit it was meant to hold.
+      this.mesh.position.y = maxY;
+      if (this.vel.y > 0) this.vel.y = 0;
+    }
+    this.atSurface = this.mesh.position.y > -backY * 1.6;
 
     // ---- banking: driven by TURN RATE, auto-levels to 0 ----
     const rollGain = 9 * (this.bankAmount / 0.45);

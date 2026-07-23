@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { buildBlueWhale, animateWhale } from './whale.js';
 import { buildSwimmer, animateSwimmer } from './swimmers.js';
 import { buildOddity, animateOddity } from './oddities.js';
+import { applyCaustics } from '../world/waterShader.js';
 
 /* ------------------------------------------------------------------ utils */
 
@@ -1034,23 +1035,34 @@ function buildCrab(sp, root) {
  * @param {number} [variant] 0..1 — picks a sub-form and shifts size/hue so a
  *        school or a patch of reef is a mixed population, not clones.
  */
-export function buildCreature(species, variant = Math.random()) {
+function litSkin(root) {
+  // caustics ripple across an animal's back near the surface, just as they do
+  // on the seabed; skip unlit materials (glowing lures, eye highlights)
+  root.traverse((o) => {
+    if (o.isMesh && o.material && o.material.type !== 'MeshBasicMaterial') {
+      applyCaustics(o.material);
+    }
+  });
+  return root;
+}
+
+export function buildCreature(species, variant = Math.random(), detail = 'med') {
   // Continuous-surface builds. These apply their own scaling, so return early.
-  if (species.shape === 'whale') return buildBlueWhale(species);
+  if (species.shape === 'whale') return litSkin(buildBlueWhale(species, { detail }));
   const SWIM = {
     shark: 'shark', dolphin: 'dolphin', porpoise: 'porpoise',
     tuna: 'tuna', fish: 'reeffish',
   }[species.shape];
   if (SWIM) {
-    const g = buildSwimmer(species, SWIM);
+    const g = buildSwimmer(species, SWIM, { detail });
     // small individual variation in size for the schooling species
     if (species.schooling) g.scale.multiplyScalar(0.86 + variant * 0.28);
-    return g;
+    return litSkin(g);
   }
   const ODD = { ray: 'ray', turtle: 'turtle', sunfish: 'sunfish',
                 squid: 'squid', angler: 'angler', snake: 'snake',
                 star: 'star', crab: 'crab' }[species.shape];
-  if (ODD) return buildOddity(species, ODD, { variant });
+  if (ODD) return litSkin(buildOddity(species, ODD, { variant, detail }));
 
   const root = new THREE.Group();
   let built;
@@ -1084,7 +1096,8 @@ export function buildCreature(species, variant = Math.random()) {
   }[species.shape] ?? species.length;
   root.scale.setScalar(norm);
   root.userData.species = species.id;
-  return built;
+  root.userData.sizeRef = species.length;
+  return litSkin(built);
 }
 
 export function animateCreature(root, dt, speed01 = 1) {

@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import { organicBody, mottle, foil, foilShaded, makeEye, makeSkinTexture, makeBumpTexture } from './bodySurface.js';
+import { wantsDeform, refreshNormals, resFor } from '../core/lod.js';
 
 const finMatVC = (extra = {}) => new THREE.MeshStandardMaterial(
   { vertexColors: true, roughness: 0.68, side: THREE.DoubleSide, ...extra });
@@ -577,7 +578,8 @@ export const PLANS = {
 
 const _texCache = new Map();
 
-export function buildSwimmer(species, planKey, { segments = 80, radial = 48 } = {}) {
+export function buildSwimmer(species, planKey, { detail = 'med' } = {}) {
+  const [segments, radial] = resFor(detail, 'swim');
   const plan = PLANS[planKey];
   const root = new THREE.Group();
 
@@ -613,6 +615,7 @@ export function buildSwimmer(species, planKey, { segments = 80, radial = 48 } = 
   root._anim = { ...plan.anim, t: Math.random() * 6 };
   root.scale.setScalar(species.length);
   root.userData.species = species.id;
+  root.userData.sizeRef = species.length;
   return root;
 }
 
@@ -621,6 +624,18 @@ export function animateSwimmer(root, dt, speed01 = 1) {
   const a = root._anim;
   if (!a || !root._basePos) return;
   a.t += dt * (0.4 + speed01 * a.freq);
+
+  // Far away the body stops flexing; only the tail keeps beating. At that
+  // distance the difference is invisible and the saving is the whole cost.
+  if (!wantsDeform(root)) {
+    if (root._tail) {
+      const amp = a.amp * (0.4 + speed01 * 0.6);
+      const off = Math.sin((a.t - a.wave) * Math.PI * 2) * amp;
+      if (a.kind === 'spineVert') root._tail.position.y = off;
+      else root._tail.position.x = off;
+    }
+    return;
+  }
 
   const vertical = a.kind === 'spineVert';       // cetaceans beat up and down
   const axis = vertical ? 1 : 0;                  // 1 = Y, 0 = X
@@ -641,7 +656,7 @@ export function animateSwimmer(root, dt, speed01 = 1) {
     }
   }
   pos.needsUpdate = true;
-  root._body.geometry.computeVertexNormals();
+  refreshNormals(root, root._body.geometry);
 
   if (root._tail) {
     const off = Math.sin((a.t - a.wave) * Math.PI * 2) * amp;

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { floorHeightAt, biomeAt, BIOME_DEF } from './biomes.js';
 import { SPECIES, speciesForBiome } from '../data/species.js';
+import { applyCaustics } from './waterShader.js';
 
 function seededRand(x, z) {
   // cheap deterministic pseudo-random per world point
@@ -310,7 +311,8 @@ export function buildChunk(noise, cx, cz) {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
-  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.95 });
+  const terrainMat = applyCaustics(new THREE.MeshStandardMaterial(
+    { vertexColors: true, flatShading: false, roughness: 0.95 }));
   const terrain = new THREE.Mesh(geo, terrainMat);
   terrain.position.set(originX, 0, originZ);
 
@@ -400,13 +402,25 @@ export function buildChunk(noise, cx, cz) {
       const wx = originX + rx, wz = originZ + rz;
       const floor = floorHeightAt(noise, wx, wz);
       // pick a y within the species depth range but above the floor
-      const [dTop, dBot] = sp.depth; // negatives, dTop shallower
-      let y = dTop + (dBot - dTop) * seededRand(wz, wx);
-      y = Math.max(floor + sp.length * 1.5, Math.min(dTop, y));
+      // Species ranges are now the real ones (tuna 0 to -985 m, angler -100 to
+      // -1500 m), so pick a depth inside the overlap of the animal's range and
+      // the water column actually present here.
+      const [dTop, dBot] = sp.depth;                 // negatives, dTop shallower
+      const colTop = Math.min(dTop, -sp.length * 0.6);
+      const colBot = Math.max(dBot, floor + sp.length * 1.5);
+      let y = colBot > colTop
+        ? colTop                                     // no room: sit just under the top
+        : colTop + (colBot - colTop) * seededRand(wz, wx);
+      y = Math.max(floor + sp.length * 1.2, Math.min(colTop, y));
       const groupN = sp.schooling ? (sp.schoolSize[0] + Math.floor(seededRand(wx, wz) * (sp.schoolSize[1] - sp.schoolSize[0]))) : 1;
       spawns.push({ speciesId: id, x: wx, y, z: wz, count: groupN });
     }
   }
+
+  // The moving light net must land on coral, rock, kelp and wrecks as well as
+  // the seabed, or the effect reads as a texture on the floor rather than as
+  // sunlight in the water.
+  decor.traverse((o) => { if (o.isMesh) applyCaustics(o.material); });
 
   return {
     terrain,

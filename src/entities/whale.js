@@ -14,6 +14,7 @@
 
 import * as THREE from 'three';
 import { organicBody, mottle, foil, makeEye, makeSkinTexture, makeBumpTexture } from './bodySurface.js';
+import { wantsDeform, refreshNormals, resFor } from '../core/lod.js';
 
 const smoothstep = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -174,7 +175,8 @@ function bumpAt(u, v) {
 
 let _skinTex = null, _bumpTex = null;
 
-export function buildBlueWhale(species, { segments = 96, radial = 56 } = {}) {
+export function buildBlueWhale(species, { detail = 'med' } = {}) {
+  const [segments, radial] = resFor(detail, 'whale');
   const root = new THREE.Group();
 
   const geo = organicBody({
@@ -253,6 +255,7 @@ export function buildBlueWhale(species, { segments = 96, radial = 56 } = {}) {
   root._anim = { kind: 'whaleSpine', freq: 0.55, amp: 1, t: Math.random() * 6 };
   root.scale.setScalar(species.length);
   root.userData.species = species.id;
+  root.userData.sizeRef = species.length;
   return root;
 }
 
@@ -264,6 +267,12 @@ export function animateWhale(root, dt, speed01 = 1) {
   const a = root._anim;
   if (!a) return;
   a.t += dt * (0.35 + speed01 * a.freq);
+
+  if (!wantsDeform(root)) {
+    const amp = 0.05 * (0.35 + speed01 * 0.65);
+    root._tail.position.y = Math.sin((a.t - 0.85) * Math.PI * 2) * amp;
+    return;
+  }
 
   const base = root._basePos;
   const pos = root._body.geometry.attributes.position;
@@ -282,7 +291,7 @@ export function animateWhale(root, dt, speed01 = 1) {
     }
   }
   pos.needsUpdate = true;
-  root._body.geometry.computeVertexNormals();
+  refreshNormals(root, root._body.geometry);
 
   // Fluke follows the wave, one beat behind the body.
   const tailT = 1.0;

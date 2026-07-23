@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import {
   organicBody, mottle, foil, foilShaded, makeEye, makeSkinTexture, makeBumpTexture,
 } from './bodySurface.js';
+import { wantsDeform, refreshNormals, resFor } from '../core/lod.js';
 
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -822,6 +823,7 @@ function buildStarfish(species, variant = Math.random()) {
   root._anim = { kind: 'starCurl', freq: 0.25, amp: 1, t: Math.random() * 6 };
   root.scale.setScalar(species.length / (T.armLen * 2));
   root.userData.species = species.id;
+  root.userData.sizeRef = species.length;
   root.userData.variant = T.key;
   return root;
 }
@@ -1027,6 +1029,7 @@ function buildCrab(species, variant = Math.random()) {
   root._anim = { kind: 'scuttle', freq: 2.4, amp: 0.13, t: Math.random() * 6 };
   root.scale.setScalar(species.length / 1.0);   // species.length = carapace width
   root.userData.species = species.id;
+  root.userData.sizeRef = species.length;
   return root;
 }
 
@@ -1034,10 +1037,11 @@ function buildCrab(species, variant = Math.random()) {
 
 const _cache = new Map();
 
-export function buildOddity(species, key, { segments = 76, radial = 52, variant } = {}) {
+export function buildOddity(species, key, { variant, detail = 'med' } = {}) {
   const plan = ODD_PLANS[key];
   if (plan.custom === 'star') return buildStarfish(species, variant);
   if (plan.custom === 'crab') return buildCrab(species, variant);
+  const [segments, radial] = resFor(detail, 'odd');
   const root = new THREE.Group();
 
   const geo = organicBody({
@@ -1074,6 +1078,7 @@ export function buildOddity(species, key, { segments = 76, radial = 52, variant 
   root._anim = { ...plan.anim, t: Math.random() * 6 };
   root.scale.setScalar(plan.norm(species.length));
   root.userData.species = species.id;
+  root.userData.sizeRef = species.length;
   return root;
 }
 
@@ -1085,6 +1090,7 @@ export function animateOddity(root, dt, speed01 = 1) {
 
   switch (a.kind) {
     case 'wingwave': {
+      if (!wantsDeform(root)) break;
       // A manta does not flap rigidly — a wave travels out along each wing.
       const base = root._basePos;
       const pos = root._body.geometry.attributes.position;
@@ -1101,7 +1107,7 @@ export function animateOddity(root, dt, speed01 = 1) {
         }
       }
       pos.needsUpdate = true;
-      root._body.geometry.computeVertexNormals();
+      refreshNormals(root, root._body.geometry);
       break;
     }
     case 'flipperFlap':
@@ -1124,6 +1130,13 @@ export function animateOddity(root, dt, speed01 = 1) {
       break;
     }
     case 'spineSide': {
+      if (!wantsDeform(root)) {
+        if (root._tail) {
+          const amp = a.amp * (0.4 + speed01 * 0.6);
+          root._tail.position.x = Math.sin((a.t - a.wave) * Math.PI * 2) * amp;
+        }
+        break;
+      }
       const base = root._basePos;
       const pos = root._body.geometry.attributes.position;
       const arr = pos.array;
@@ -1139,13 +1152,13 @@ export function animateOddity(root, dt, speed01 = 1) {
         }
       }
       pos.needsUpdate = true;
-      root._body.geometry.computeVertexNormals();
+      refreshNormals(root, root._body.geometry);
       if (root._tail) root._tail.position.x = Math.sin((a.t - a.wave) * Math.PI * 2) * amp;
       break;
     }
   }
 
-  if (a.kind === 'starCurl' && root._basePos) {
+  if (a.kind === 'starCurl' && root._basePos && wantsDeform(root)) {
     // arms lift and settle very slowly, as a sea star creeps
     const base = root._basePos;
     const pos = root._body.geometry.attributes.position;
@@ -1158,7 +1171,7 @@ export function animateOddity(root, dt, speed01 = 1) {
         + Math.sin(a.t * Math.PI * 2 * 0.4 + ang * 2.5) * r * r * 0.14;
     }
     pos.needsUpdate = true;
-    root._body.geometry.computeVertexNormals();
+    refreshNormals(root, root._body.geometry);
   }
   if (a.kind === 'scuttle' && root._legs) {
     for (const l of root._legs) {

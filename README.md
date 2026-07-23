@@ -61,6 +61,7 @@ Xong. Mỗi lần `git push` mới, trang tự cập nhật.
 | **B** hoặc nút 🔇 | Bật/tắt âm thanh đại dương |
 | **Cuộn chuột** | Phóng to / thu nhỏ khoảng cách camera (0,25×–3×) |
 | **F** | Chuyển góc nhìn thứ nhất (nhìn từ mắt cá) |
+| **G** | Bật/tắt bảng đo hiệu năng (FPS, tam giác, số sinh vật) |
 | **P** | Chế độ chụp ảnh (ẩn UI, camera quay quanh cá) |
 | **J** | Mở/đóng Nhật ký thám hiểm |
 | **E** | Mở/đóng Bách khoa toàn thư |
@@ -113,8 +114,32 @@ Tất cả nằm trong `src/config.js`: `chunk.renderRadius` (tầm nhìn — gi
 
 ---
 
+## 🌊 Nước và ánh sáng
+- **Sóng Gerstner thật** trên GPU: bốn lớp sóng khác hướng và bước sóng, đỉnh nhọn đáy phẳng như sóng biển thật (sóng hình sin đối xứng trông như tấm vải).
+- **Cửa sổ Snell**: nhìn lên từ dưới nước, toàn bộ bầu trời bị khúc xạ dồn vào một đĩa sáng rộng khoảng 97° ngay trên đầu, có mặt trời lấp lánh gợn theo sóng; ngoài đĩa đó mặt nước phản chiếu biển tối trở lại.
+- **Vệt caustic**: đỉnh sóng hội tụ ánh nắng thành lưới sáng lay động, chiếu lên đáy biển, san hô, xác tàu **và cả lưng cá** — mờ dần và tắt hẳn khoảng 60 m.
+- **Mất màu theo độ sâu đúng vật lý**: đỏ tắt gần hết ở 30 m (còn 1%), lục còn 41%, lam còn 72%; xuống 80 m chỉ còn lam (42%). Đây là thứ khiến độ sâu *trông ra* độ sâu chứ không chỉ tối đi.
+- **Bơi lên mặt nước**: bỏ trần cứng cũ. Cá voi, cá heo, rùa, cá mặt trăng nay nổi lên phá sóng với khoảng 77% thân trên mặt nước; lực cản tăng vọt ở mét cuối nên cảm giác đúng như trồi lên.
+
+## ⚡ Hiệu năng
+Mô hình chi tiết rất tốn: mỗi sinh vật 8–13 nghìn tam giác, và việc uốn thân theo sóng phải tính lại pháp tuyến mỗi khung. Đo được **1,81 ms cho MỘT con** — 60 con là 108 ms/khung, tức ~9 FPS.
+
+Hệ **LOD** chia sinh vật thành 4 bậc theo khoảng cách:
+
+| Bậc | Xử lý | Chi phí |
+|---|---|---|
+| 0 — gần | Uốn thân + tính lại pháp tuyến (3 khung/lần) | 0,186 ms |
+| 1 — vừa | Uốn thân, giữ pháp tuyến cũ | 0,043 ms |
+| 2 — xa | Chỉ vây và đuôi động | 0,0003 ms |
+| 3 — rất xa | Nghỉ | 0,0003 ms |
+
+Bậc 0 còn bị giới hạn số lượng (5/8/12 con tuỳ mật độ). Sinh vật NPC cũng dùng lưới thưa hơn người chơi (giảm 47% tam giác).
+
+Kết quả: **150 con từ 271 ms xuống 3,2 ms mỗi khung — nhanh gấp 86 lần.** Nhấn **G** trong game để xem FPS thực tế.
+
 ## ✨ Có gì trong thế giới
 - **Camera tự chỉnh:** cuộn chuột kéo góc nhìn sát vào hoặc lùi ra (0,25×–3× khoảng cách mặc định) — cá nhỏ như cá hề có thể zoom sát để ngắm chi tiết. Nhấn **F** để vào góc nhìn thứ nhất, nhìn thẳng từ mắt con vật.
+- **Độ sâu theo số liệu thật** (FishBase/IUCN/NOAA): cá ngừ vây xanh 1–985 m, cá mập trắng 1–1.200 m, cá mặt trăng 0,8–644 m, cá đuối manta 1–1.000 m, cá cần câu 100–1.500 m, mực khổng lồ 300–1.000 m. Loài thở bằng phổi và loài phơi nắng đều lên tới sát mặt nước.
 - **Cảm giác khối lượng khi điều khiển:** loài càng lớn càng nặng nề khi đổi hướng. Cá hề bẻ lái tức thì (độ nhanh nhẹn 14, quay tối đa 6,0 rad/s); cá voi xanh mất khoảng một giây để vào cua và cũng chừng ấy để ra (2,2 và 1,1 rad/s) — kèm quán tính khi tăng/giảm tốc và độ nghiêng thân lớn hơn khi lượn.
 - **Sinh vật dựng theo giải phẫu thật:** mỗi loài lớn là **một mặt cong liền mạch** có tiết diện biến đổi dọc thân (đầu bẹt rộng → giữa tròn đầy → cuống đuôi dẹt đứng), không phải các khối hình ghép lại. Chi tiết da (rãnh bụng cá voi, khe mang cá mập, vạch cá hề, vân vảy) được **sinh bằng thuật toán vào texture** — không dùng file ảnh nào, nên sắc nét mà vẫn nhẹ.
 - **Mắt thật:** nhãn cầu sẫm lắp chìm gần phẳng với đầu, vành mống mắt mỏng theo từng loài (cá hề vàng cam, cá ngừ vàng đồng, cá mập gần đen), kèm một chấm sáng ướt.

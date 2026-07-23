@@ -39,6 +39,7 @@ export const CONFIG = {
 
   perf: {
     maxCreatures: 150,      // hard cap on simultaneous NPC creatures
+    fullDetailCreatures: 8, // how many may run full mesh deformation per frame
     plankton: 1400,         // ambient drifting particle count
     godRays: 14,            // number of light shafts near surface
   },
@@ -54,15 +55,16 @@ export function cruiseFor(species) {
 // Creature-density presets the player can pick in the menu. The adaptive
 // quality system can still step this down automatically on a slow machine.
 export const DENSITY = {
-  low:    { maxCreatures: 70,  plankton: 900,  renderRadius: 2 },
-  medium: { maxCreatures: 150, plankton: 1400, renderRadius: 3 },
-  high:   { maxCreatures: 240, plankton: 2000, renderRadius: 3 },
+  low:    { maxCreatures: 70,  plankton: 900,  renderRadius: 2, fullDetailCreatures: 5 },
+  medium: { maxCreatures: 150, plankton: 1400, renderRadius: 3, fullDetailCreatures: 8 },
+  high:   { maxCreatures: 240, plankton: 2000, renderRadius: 3, fullDetailCreatures: 12 },
 };
 
 export function applyDensity(level) {
   const d = DENSITY[level] || DENSITY.medium;
   CONFIG.perf.maxCreatures = d.maxCreatures;
   CONFIG.perf.plankton = d.plankton;
+  CONFIG.perf.fullDetailCreatures = d.fullDetailCreatures;
   CONFIG.chunk.renderRadius = d.renderRadius;
   return d;
 }

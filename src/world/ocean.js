@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { BIOME_DEF } from './biomes.js';
+import { makeWaterSurface, CAUSTIC, depthAbsorption } from './waterShader.js';
 
 function lerpColor(a, b, t) {
   return a.clone().lerp(b, THREE.MathUtils.clamp(t, 0, 1));
@@ -26,17 +27,14 @@ export class Ocean {
   }
 
   _buildSurface() {
-    // Big translucent plane at y=0 with animated wave vertices.
-    const geo = new THREE.PlaneGeometry(6000, 6000, 60, 60);
-    geo.rotateX(-Math.PI / 2);
-    this._surfBase = geo.attributes.position.array.slice();
-    const m = new THREE.MeshStandardMaterial({
-      color: 0x8fd4ee, transparent: true, opacity: 0.35,
-      roughness: 0.15, metalness: 0.0, side: THREE.DoubleSide,
-    });
-    this.surface = new THREE.Mesh(geo, m);
+    // Gerstner-wave surface with a refracted sun (Snell's window) when seen
+    // from below. See world/waterShader.js.
+    const { mesh, uniforms } = makeWaterSurface(6000, 200);
+    this.surface = mesh;
+    this.surfaceUniforms = uniforms;
     this.surface.position.y = CONFIG.world.surfaceY;
     this.scene.add(this.surface);
+    this._absorb = new THREE.Vector3(1, 1, 1);
   }
 
   _buildGodRays() {
@@ -101,6 +99,13 @@ export class Ocean {
     const depth = Math.max(0, -playerPos.y);
     const depth01 = THREE.MathUtils.clamp(depth / 350, 0, 1);
     const tint = lerpColor(new THREE.Color(def.waterTint), this.deepColor, depth01);
+    // Water strips colour unevenly: red is gone within a few metres, green
+    // by tens of metres, blue survives longest. Shaping the fog this way is
+    // what makes depth read as depth rather than as a dimmer switch.
+    const ab = depthAbsorption(depth, this._absorb);
+    tint.r *= 0.16 + 0.84 * ab.x;
+    tint.g *= 0.30 + 0.70 * ab.y;
+    tint.b *= 0.55 + 0.45 * ab.z;
     tint.multiplyScalar(0.22 + 0.78 * daylight);       // night darkens the water
     this._currentTint.lerp(tint, 0.05);
 
@@ -112,24 +117,35 @@ export class Ocean {
     this.scene.fog.far = far;
     this.scene.background.copy(this._currentTint);
 
-    // --- Animate surface waves ---
-    const p = this.surface.geometry.attributes.position;
-    const base = this._surfBase;
-    for (let i = 0; i < p.count; i++) {
-      const x = base[i * 3], z = base[i * 3 + 2];
-      p.array[i * 3 + 1] = Math.sin(x * 0.02 + time) * 1.2 + Math.cos(z * 0.03 + time * 0.8) * 1.0;
-    }
-    p.needsUpdate = true;
+    // --- Surface: the shader does the wave maths on the GPU ---
+    const u = this.surfaceUniforms;
+    u.uTime.value = time;
+    u.uDaylight.value = daylight;
+    u.uCamY.value = playerPos.y;
+    u.uShallow.value.set(def.waterTint).lerp(new THREE.Color(0x9fe8f2), 0.35);
+    u.uDeep.value.copy(this.deepColor).lerp(new THREE.Color(def.waterTint), 0.4);
     this.surface.position.x = playerPos.x;
     this.surface.position.z = playerPos.z;
 
+    // --- Caustics: same clock as the waves, faded by daylight ---
+    CAUSTIC.time.value = time;
+    CAUSTIC.daylight.value = daylight;
+    CAUSTIC.strength.value = (def.clarity || 1) * 1.05;
+
     // --- God rays follow surface, gently sway ---
     this.rays.position.set(playerPos.x, 0, playerPos.z);
+    // Shafts lean along the sun direction and shimmer with the wave field, so
+    // they read as light coming THROUGH the surface rather than as static cones.
     this.rays.children.forEach((c, i) => {
-      c.rotation.z = Math.sin(time * 0.3 + c.userData.wobble) * 0.06;
+      const shimmer = Math.sin(time * 1.7 + i * 2.1);
+      c.rotation.z = -0.30 + Math.sin(time * 0.3 + c.userData.wobble) * 0.05;
+      c.rotation.x = 0.22 + Math.cos(time * 0.24 + c.userData.wobble) * 0.05;
       c.position.x = ((i * 37) % 200) - 100 + Math.sin(time * 0.1 + i) * 6;
       c.position.z = ((i * 71) % 200) - 100;
-      c.material.opacity = 0.05 * (1 - depth01) * daylight; // fade with depth & night
+      c.scale.x = c.scale.z = 0.85 + shimmer * 0.15;
+      // sunlight is only a visible beam in the upper water column
+      const band = 1 - THREE.MathUtils.clamp(depth / 140, 0, 1);
+      c.material.opacity = 0.075 * band * daylight;
     });
 
     // --- Plankton drifts + wraps around player (infinite feel) ---

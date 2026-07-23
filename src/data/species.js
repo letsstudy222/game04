@@ -15,7 +15,7 @@ export const SPECIES = {
     colors: { body: 0xff7a1a, band: 0xffffff, fin: 0x1c1c1c, belly: 0xffb060 },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef'],
-    depth: [-1, -18],            // reef flats & slopes
+    depth: [-1, -15],            // reef flats & slopes
     schooling: true,
     schoolSize: [6, 14],
     speedFactor: 0.5,            // small fish -> slower absolute cruise
@@ -44,7 +44,7 @@ export const SPECIES = {
     colors: { body: 0x4b6b3a, shell: 0x3a4d2b, fin: 0x5c7a44, belly: 0xcfc19a },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
-    depth: [-1, -45],
+    depth: [-0.4, -40],
     schooling: false,
     speedFactor: 0.7,
     info: {
@@ -72,7 +72,7 @@ export const SPECIES = {
     colors: { body: 0x2f4a6b, band: 0x8fb7d6, fin: 0xd6b23a, belly: 0xe8eef2 },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean'],
-    depth: [-5, -250],
+    depth: [-1, -985],
     schooling: true,
     schoolSize: [5, 12],
     speedFactor: 1.35,          // fast pelagic swimmer
@@ -101,7 +101,7 @@ export const SPECIES = {
     colors: { body: 0x6f7c85, band: 0x8a969d, fin: 0x5b666d, belly: 0xeef1f2 },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'kelp_forest'],
-    depth: [-3, -260],
+    depth: [-1, -1200],
     schooling: false,
     speedFactor: 1.0,
     info: {
@@ -129,7 +129,7 @@ export const SPECIES = {
     colors: { body: 0x4a6f8a, band: 0x5f86a0, fin: 0x3d5c73, belly: 0x9fb4bf },
     homeBiome: 'polar',
     spawnBiomes: ['polar', 'open_ocean'],
-    depth: [-6, -200],
+    depth: [-1.5, -500],
     schooling: false,
     speedFactor: 0.9,
     info: {
@@ -157,7 +157,7 @@ export const SPECIES = {
     colors: { body: 0x7f97a6, band: 0xa9bcc7, fin: 0x5f7482, belly: 0xdfe8ec },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'coral_reef'],
-    depth: [-2, -80],
+    depth: [-0.5, -300],
     schooling: true,
     schoolSize: [4, 9],
     speedFactor: 1.3,
@@ -186,7 +186,7 @@ export const SPECIES = {
     colors: { body: 0x2b3540, fin: 0x1f2830, belly: 0xe8eef0 },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'coral_reef'],
-    depth: [-3, -60],
+    depth: [-1, -1000],
     schooling: false,
     speedFactor: 0.8,
     info: {
@@ -214,7 +214,7 @@ export const SPECIES = {
     colors: { body: 0x241f2b, fin: 0x1a1620, belly: 0x3a2f42 },
     homeBiome: 'deep_sea',
     spawnBiomes: ['deep_sea'],
-    depth: [-350, -650],
+    depth: [-100, -1500],
     schooling: false,
     speedFactor: 0.4,
     info: {
@@ -242,7 +242,7 @@ export const SPECIES = {
     colors: { body: 0x8c3f52, fin: 0x6e2f40, belly: 0xd9a3ab },
     homeBiome: 'deep_sea',
     spawnBiomes: ['deep_sea'],
-    depth: [-300, -900],
+    depth: [-300, -1000],
     schooling: false,
     speedFactor: 0.75,
     info: {
@@ -270,7 +270,7 @@ export const SPECIES = {
     colors: { body: 0x9aa7ad, fin: 0x7c8a92, belly: 0xdfe6e9 },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'kelp_forest'],
-    depth: [-2, -180],
+    depth: [-0.8, -644],
     schooling: false,
     speedFactor: 0.35,
     info: {
@@ -298,7 +298,7 @@ export const SPECIES = {
     colors: { body: 0x6e7c86, fin: 0x2b3238, belly: 0xe6ecef },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
-    depth: [-3, -50],
+    depth: [-0.6, -50],
     schooling: true,
     schoolSize: [2, 3],
     speedFactor: 1.0,
@@ -327,7 +327,7 @@ export const SPECIES = {
     colors: { body: 0x2f5f8f, band: 0x1a1a24, fin: 0x9fc4e8, belly: 0xe8eef4 },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef'],
-    depth: [-1, -30],
+    depth: [-0.3, -60],
     schooling: false,
     speedFactor: 0.6,
     info: {
@@ -356,7 +356,7 @@ export const SPECIES = {
     colors: { body: 0x6fe6d0, band: 0xaef4ff, fin: 0x3fbfae, belly: 0xdffaf5 },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
-    depth: [-1, -25],
+    depth: [-1, -20],
     schooling: true,
     schoolSize: [14, 26],
     speedFactor: 0.45,
@@ -385,7 +385,7 @@ export const SPECIES = {
     colors: { body: 0x3f7fd6, fin: 0x2f5fa8, belly: 0x9fc4ee },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
-    depth: [-1, -30],
+    depth: [-1, -40],
     schooling: false,
     speedFactor: 0.06,          // barely moves — clings to the floor
     benthic: true,              // sits ON the seafloor
@@ -415,7 +415,7 @@ export const SPECIES = {
     colors: { body: 0xb8341d, fin: 0xe0cdae, belly: 0xf0e3cd },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
-    depth: [-1, -35],
+    depth: [-0.5, -35],
     schooling: false,
     speedFactor: 0.12,
     benthic: true,

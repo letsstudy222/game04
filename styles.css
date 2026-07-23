@@ -153,6 +153,19 @@ body {
 }
 .compass-n { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--bio); }
 
+/* ---------- Performance readout ---------- */
+#stats {
+  position: fixed; top: 18px; left: 18px; z-index: 12;
+  background: var(--panel); backdrop-filter: blur(8px);
+  border: 1px solid var(--hair); border-radius: 12px;
+  padding: 11px 14px; font-family: 'Space Grotesk', monospace;
+  font-size: 11.5px; line-height: 1.65; color: var(--slate); min-width: 178px;
+}
+#stats b { color: var(--foam); font-weight: 600; float: right; }
+#stats .good { color: var(--bio); }
+#stats .warn { color: #e8c33f; }
+#stats .bad { color: #e05252; }
+
 /* ---------- Minimap ---------- */
 #minimap {
   position: fixed; top: 18px; right: 18px; z-index: 11;
