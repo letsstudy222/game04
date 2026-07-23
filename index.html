@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Abyssal — Mô phỏng thế giới đại dương</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- No build step: Three.js loaded via import map from CDN -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- Loading -->
+  <div id="loading" class="overlay center">
+    <div class="loader">
+      <div class="loader-ring"></div>
+      <p>Đang lặn xuống…</p>
+    </div>
+  </div>
+
+  <!-- Menu / species select -->
+  <div id="menu" class="overlay">
+    <div class="menu-inner">
+      <header class="menu-head">
+        <span class="eyebrow">Nhật ký thám hiểm · tỉ lệ thật</span>
+        <h1 class="title">ABYSSAL</h1>
+        <p class="subtitle">Chọn một loài. Bơi ra đại dương mở, không giới hạn — vùng biển sinh ra theo mỗi cú bơi của bạn.</p>
+      </header>
+      <div id="menu-cards"></div>
+      <div class="seed-row">
+        <label for="seed-input" class="seed-lbl">Seed thế giới</label>
+        <input id="seed-input" maxlength="32" spellcheck="false" autocomplete="off" />
+        <button id="seed-btn">Tạo thế giới mới</button>
+      </div>
+      <footer class="menu-foot">
+        Điều khiển: <b>W</b> bơi tới · <b>A/D</b> hoặc chuột để rẽ · <b>Space</b> lên · <b>C</b> xuống · <b>Shift</b> tăng tốc · <b>B</b> âm thanh · <b>P</b> chụp ảnh · <b>J</b> nhật ký · <b>M</b> đổi loài
+      </footer>
+    </div>
+  </div>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden"></div>
+
+  <!-- Controls hint -->
+  <div id="hint" class="hidden">
+    Nhấp chuột để khoá con trỏ &amp; nhìn tự do · <b>W</b> bơi · <b>Shift</b> tăng tốc · <b>B</b> âm thanh · <b>P</b> chụp ảnh · <b>J</b> nhật ký · <b>M</b> đổi loài
+  </div>
+
+  <!-- Ambient sound toggle -->
+  <button id="sound-btn" class="sound-btn" aria-label="Bật/tắt âm thanh đại dương" aria-pressed="false">🔇</button>
+
+  <!-- Discovery toasts -->
+  <div id="toasts"></div>
+
+  <!-- Field journal (key J) -->
+  <div id="journal" class="overlay center hidden">
+    <div class="j-inner" id="journal-body"></div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
