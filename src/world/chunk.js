@@ -13,34 +13,108 @@ function seededRand(x, z) {
 }
 
 // ---- Decoration builders (low-poly) ----
+// Five coral growth forms. A reef built from one shape reads as wallpaper;
+// mixing branching, brain, table, fan and tube corals gives it structure.
 function makeCoral(accent) {
   const g = new THREE.Group();
-  const palette = [accent, 0xff9aa2, 0xffb7b2, 0xb5ead7, 0xc7ceea];
-  const n = 3 + Math.floor(Math.random() * 4);
-  for (let i = 0; i < n; i++) {
-    const col = palette[Math.floor(Math.random() * palette.length)];
-    const m = new THREE.MeshStandardMaterial({ color: col, flatShading: false, roughness: 0.9 });
-    const h = 0.6 + Math.random() * 1.8;
-    const branch = new THREE.Mesh(new THREE.ConeGeometry(0.12 + Math.random() * 0.15, h, 5), m);
-    branch.position.set((Math.random() - 0.5) * 0.9, h / 2, (Math.random() - 0.5) * 0.9);
-    branch.rotation.z = (Math.random() - 0.5) * 0.5;
-    g.add(branch);
-    if (Math.random() > 0.5) {
-      const bulb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18 + Math.random() * 0.2, 1), m);
-      bulb.position.copy(branch.position).y = h * 0.9;
-      g.add(bulb);
+  const palette = [accent, 0xff9aa2, 0xffb7b2, 0xb5ead7, 0xc7ceea,
+                   0xf6c453, 0xa06cd5, 0x63d2b2];
+  const pick = () => palette[Math.floor(Math.random() * palette.length)];
+  const mat = (col, rough = 0.9) => new THREE.MeshStandardMaterial(
+    { color: col, roughness: rough, flatShading: false });
+  const form = Math.floor(Math.random() * 5);
+
+  if (form === 0) {                          // branching staghorn
+    const m = mat(pick());
+    const n = 4 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) {
+      const h = 0.7 + Math.random() * 1.9;
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.13, h, 6), m);
+      b.position.set((Math.random() - 0.5) * 0.9, h / 2, (Math.random() - 0.5) * 0.9);
+      b.rotation.z = (Math.random() - 0.5) * 0.55;
+      b.rotation.x = (Math.random() - 0.5) * 0.55;
+      g.add(b);
+      for (let k = 0; k < 2; k++) {          // side branches
+        const bh = h * (0.3 + Math.random() * 0.3);
+        const s2 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, bh, 5), m);
+        s2.position.copy(b.position);
+        s2.position.y += h * 0.25;
+        s2.position.x += (Math.random() - 0.5) * 0.3;
+        s2.rotation.z = (Math.random() - 0.5) * 1.5;
+        g.add(s2);
+      }
+    }
+  } else if (form === 1) {                   // brain coral
+    const m = mat(pick(), 0.95);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.7 + Math.random() * 0.5, 16, 12), m);
+    b.scale.set(1, 0.62, 1);
+    b.position.y = 0.3;
+    g.add(b);
+    const ridge = mat(pick(), 1);
+    for (let i = 0; i < 9; i++) {            // meandering ridges
+      const r = new THREE.Mesh(new THREE.TorusGeometry(0.30 + i * 0.055, 0.035, 6, 16), ridge);
+      r.rotation.x = Math.PI / 2;
+      r.position.y = 0.36 + Math.sin(i) * 0.08;
+      r.scale.y = 0.6;
+      g.add(r);
+    }
+  } else if (form === 2) {                   // table coral
+    const m = mat(pick());
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 0.7, 8), m);
+    stem.position.y = 0.35; g.add(stem);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 0.85, 0.11, 14), m);
+    top.position.y = 0.74; g.add(top);
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const nub = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 5), m);
+      nub.position.set(Math.cos(a) * 0.75, 0.85, Math.sin(a) * 0.75);
+      g.add(nub);
+    }
+  } else if (form === 3) {                   // sea fan
+    const m = mat(pick(), 0.85);
+    m.side = THREE.DoubleSide;
+    const fan = new THREE.Mesh(new THREE.CircleGeometry(0.95, 14, 0, Math.PI), m);
+    fan.position.y = 0.05; fan.rotation.y = Math.random() * Math.PI;
+    g.add(fan);
+    const rib = mat(pick(), 1);
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 6) * Math.PI;
+      const r = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.028, 0.9, 5), rib);
+      r.position.set(Math.cos(a) * 0.42, 0.45 + Math.sin(a) * 0.1, 0);
+      r.rotation.z = Math.PI / 2 - a;
+      r.rotation.y = fan.rotation.y;
+      g.add(r);
+    }
+  } else {                                   // tube / barrel sponge cluster
+    const m = mat(pick(), 0.95);
+    const n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      const h = 0.6 + Math.random() * 1.1;
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.17, h, 12, 1, true), m);
+      t.material.side = THREE.DoubleSide;
+      t.position.set((Math.random() - 0.5) * 0.7, h / 2, (Math.random() - 0.5) * 0.7);
+      t.rotation.z = (Math.random() - 0.5) * 0.25;
+      g.add(t);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.035, 6, 14), m);
+      lip.rotation.x = Math.PI / 2;
+      lip.position.copy(t.position); lip.position.y += h / 2;
+      g.add(lip);
     }
   }
+  g.scale.setScalar(0.8 + Math.random() * 0.7);
   return g;
 }
 
 function makeKelp() {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x3f7a3a, flatShading: false, roughness: 0.9, side: THREE.DoubleSide });
+  const tone = Math.random();
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(0.24 + tone * 0.09, 0.42 + tone * 0.2, 0.22 + tone * 0.14),
+    flatShading: false, roughness: 0.9, side: THREE.DoubleSide });
   const strands = 2 + Math.floor(Math.random() * 3);
   for (let s = 0; s < strands; s++) {
     const h = 4 + Math.random() * 8;
-    const geo = new THREE.PlaneGeometry(0.4, h, 1, 6);
+    const geo = new THREE.PlaneGeometry(0.28 + Math.random() * 0.32, h, 1, 6);
     geo.translate(0, h / 2, 0);
     const blade = new THREE.Mesh(geo, mat);
     blade.position.set((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5);

@@ -59,6 +59,8 @@ Xong. Mỗi lần `git push` mới, trang tự cập nhật.
 | **C** | Lặn xuống |
 | **Shift** | Tăng tốc |
 | **B** hoặc nút 🔇 | Bật/tắt âm thanh đại dương |
+| **Cuộn chuột** | Phóng to / thu nhỏ khoảng cách camera (0,25×–3×) |
+| **F** | Chuyển góc nhìn thứ nhất (nhìn từ mắt cá) |
 | **P** | Chế độ chụp ảnh (ẩn UI, camera quay quanh cá) |
 | **J** | Mở/đóng Nhật ký thám hiểm |
 | **E** | Mở/đóng Bách khoa toàn thư |
@@ -112,6 +114,8 @@ Tất cả nằm trong `src/config.js`: `chunk.renderRadius` (tầm nhìn — gi
 ---
 
 ## ✨ Có gì trong thế giới
+- **Camera tự chỉnh:** cuộn chuột kéo góc nhìn sát vào hoặc lùi ra (0,25×–3× khoảng cách mặc định) — cá nhỏ như cá hề có thể zoom sát để ngắm chi tiết. Nhấn **F** để vào góc nhìn thứ nhất, nhìn thẳng từ mắt con vật.
+- **Cảm giác khối lượng khi điều khiển:** loài càng lớn càng nặng nề khi đổi hướng. Cá hề bẻ lái tức thì (độ nhanh nhẹn 14, quay tối đa 6,0 rad/s); cá voi xanh mất khoảng một giây để vào cua và cũng chừng ấy để ra (2,2 và 1,1 rad/s) — kèm quán tính khi tăng/giảm tốc và độ nghiêng thân lớn hơn khi lượn.
 - **Sinh vật dựng theo giải phẫu thật:** mỗi loài lớn là **một mặt cong liền mạch** có tiết diện biến đổi dọc thân (đầu bẹt rộng → giữa tròn đầy → cuống đuôi dẹt đứng), không phải các khối hình ghép lại. Chi tiết da (rãnh bụng cá voi, khe mang cá mập, vạch cá hề, vân vảy) được **sinh bằng thuật toán vào texture** — không dùng file ảnh nào, nên sắc nét mà vẫn nhẹ.
 - **Mắt thật:** nhãn cầu sẫm lắp chìm gần phẳng với đầu, vành mống mắt mỏng theo từng loài (cá hề vàng cam, cá ngừ vàng đồng, cá mập gần đen), kèm một chấm sáng ướt.
 - **Thân uốn theo sóng lan truyền:** cá và cá mập lượn ngang, cá voi và cá heo nhấp nhô dọc — đúng cơ chế bơi của từng nhóm sinh vật.

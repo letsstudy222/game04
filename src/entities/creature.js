@@ -11,7 +11,7 @@ const _fwd = new THREE.Vector3();
 export class Creature {
   constructor(species, pos) {
     this.species = species;
-    this.mesh = buildCreature(species);
+    this.mesh = buildCreature(species, Math.random());
     this.mesh.position.copy(pos);
     this.speed = cruiseFor(species) * 0.6;
     this.vel = new THREE.Vector3(

@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { buildBlueWhale, animateWhale } from './whale.js';
 import { buildSwimmer, animateSwimmer } from './swimmers.js';
+import { buildOddity, animateOddity } from './oddities.js';
 
 /* ------------------------------------------------------------------ utils */
 
@@ -1028,14 +1029,28 @@ function buildCrab(sp, root) {
 
 /* --------------------------------------------------------------- public */
 
-export function buildCreature(species) {
+/**
+ * @param {object} species
+ * @param {number} [variant] 0..1 — picks a sub-form and shifts size/hue so a
+ *        school or a patch of reef is a mixed population, not clones.
+ */
+export function buildCreature(species, variant = Math.random()) {
   // Continuous-surface builds. These apply their own scaling, so return early.
   if (species.shape === 'whale') return buildBlueWhale(species);
   const SWIM = {
     shark: 'shark', dolphin: 'dolphin', porpoise: 'porpoise',
     tuna: 'tuna', fish: 'reeffish',
   }[species.shape];
-  if (SWIM) return buildSwimmer(species, SWIM);
+  if (SWIM) {
+    const g = buildSwimmer(species, SWIM);
+    // small individual variation in size for the schooling species
+    if (species.schooling) g.scale.multiplyScalar(0.86 + variant * 0.28);
+    return g;
+  }
+  const ODD = { ray: 'ray', turtle: 'turtle', sunfish: 'sunfish',
+                squid: 'squid', angler: 'angler', snake: 'snake',
+                star: 'star', crab: 'crab' }[species.shape];
+  if (ODD) return buildOddity(species, ODD, { variant });
 
   const root = new THREE.Group();
   let built;
@@ -1076,7 +1091,16 @@ export function animateCreature(root, dt, speed01 = 1) {
   const a = root._anim;
   if (!a) return;
   if (a.kind === 'whaleSpine') { animateWhale(root, dt, speed01); return; }
-  if (a.kind === 'spineSide' || a.kind === 'spineVert') { animateSwimmer(root, dt, speed01); return; }
+  if (a.kind === 'spineVert') { animateSwimmer(root, dt, speed01); return; }
+  if (a.kind === 'spineSide') {
+    // shared name: swimmers deform via their own path, oddities via theirs
+    (root._bodyLength !== undefined ? animateOddity : animateSwimmer)(root, dt, speed01);
+    return;
+  }
+  if (['wingwave', 'flipperFlap', 'sunScull', 'jetArms', 'starCurl', 'scuttle']
+      .includes(a.kind)) {
+    animateOddity(root, dt, speed01); return;
+  }
   a.t += dt * (0.55 + speed01 * a.freq);
   const s = Math.sin(a.t * Math.PI * 2);
 

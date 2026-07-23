@@ -202,6 +202,11 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyB') toggleSound();
   if (e.code === 'KeyJ') toggleJournal();
   if (e.code === 'KeyE') toggleEncyc();
+  if (e.code === 'KeyF' && player && (state === 'playing' || state === 'photo')) {
+    const on = player.toggleFirstPerson();
+    toasts.show(on ? '👁 Góc nhìn thứ nhất — nhấn <b>F</b> để quay lại'
+                   : '🎥 Góc nhìn thứ ba', 2600);
+  }
 });
 
 // --- ambient sound ---

@@ -6,6 +6,7 @@ export class Input {
     this.keys = new Set();
     this.mouseDX = 0;
     this.mouseDY = 0;
+    this.wheel = 0;
     this.locked = false;
 
     window.addEventListener('keydown', (e) => {
@@ -25,6 +26,11 @@ export class Input {
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
     });
+    window.addEventListener('wheel', (e) => {
+      this.wheel += e.deltaY;
+      if (this.locked) e.preventDefault();
+    }, { passive: false });
+
     document.addEventListener('mousemove', (e) => {
       if (this.locked) {
         this.mouseDX += e.movementX;
@@ -34,6 +40,13 @@ export class Input {
   }
 
   down(code) { return this.keys.has(code); }
+
+  // consume accumulated wheel delta for this frame
+  consumeWheel() {
+    const w = this.wheel;
+    this.wheel = 0;
+    return w;
+  }
 
   // consume accumulated mouse delta for this frame
   consumeMouse() {

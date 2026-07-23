@@ -40,9 +40,14 @@ function sampler(stations, key) {
  * @param {number} o.radial    vertices around each cross-section
  * @param {function} [o.groove] (t, theta) => inward displacement fraction 0..1
  * @param {function} [o.shade]  (t, theta, yNorm) => THREE.Color
+ * @param {function} [o.yScale] (t, cosTheta) => multiplier on the vertical
+ *        half-axis only. An ellipse stays thick most of the way to its edge,
+ *        which is wrong for wings and fins; this lets a manta's wing thin out
+ *        towards the tip while the central body stays deep.
  */
 export function organicBody({
   stations, length = 1, segments = 64, radial = 48, groove = null, shade = null,
+  yScale = null,
 }) {
   const w = sampler(stations, 'w');
   const hT = sampler(stations, 'hTop');
@@ -62,7 +67,8 @@ export function organicBody({
       const g = groove ? 1 - groove(t, th) : 1;
       const x = ww * ct * g;
       const h = st >= 0 ? ht : hb;
-      const y = h * st * g + yy;
+      const ys = yScale ? yScale(t, ct) : 1;
+      const y = h * st * g * ys + yy;
       // head at +Z so the animal faces forward in the game's convention
       const z = (0.5 - t) * length;
       pos.push(x, y, z);

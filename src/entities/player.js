@@ -39,18 +39,49 @@ export class Player {
     this.camPitch = 0;
 
     this.cruise = cruiseFor(species) * 1.3;
+
+    // --- Mass-based handling -------------------------------------------
+    // A 28 m whale should not pivot like a 9 cm clownfish. Three quantities
+    // scale with body length so large animals feel like they carry momentum:
+    //   agility  — how quickly turn input is taken up and shed (inertia)
+    //   maxTurn  — hard ceiling on angular velocity
+    //   thrustLag— how slowly speed builds and bleeds off
+    const L = species.length;
+    this.agility = THREE.MathUtils.clamp(14 / Math.pow(L, 0.55), 2.0, 14);
+    this.maxTurn = THREE.MathUtils.clamp(3.4 / Math.pow(L, 0.34), 0.55, 6.0);
+    this.thrustLag = THREE.MathUtils.clamp(7.5 / Math.pow(L, 0.42), 1.1, 7.5);
+    this.bankAmount = THREE.MathUtils.clamp(0.28 + L * 0.02, 0.28, 0.62);
     // Sub-linear camera pull-back (length^0.72). Large animals deliberately
     // overflow the frame — that overflow IS the feeling of size. Linear
     // scaling would give every species an identical screen footprint.
     this.camDist = 2.05 * Math.pow(species.length, 0.72) + 1.15;
     this.camHigh = 0.42 * Math.pow(species.length, 0.72) + 0.28;
     this.baseFov = camera.fov;
+    // Scroll-wheel zoom multiplier on the follow distance, and an eye-level
+    // first-person mode. Both are remembered per species instance.
+    this.camZoom = 1;
+    this.firstPerson = false;
 
     this._updateCamera(1, true);
   }
 
+  toggleFirstPerson() {
+    this.firstPerson = !this.firstPerson;
+    // Hide the body: from inside the head you would otherwise see back faces.
+    this.mesh.visible = !this.firstPerson;
+    this._updateCamera(1, true);
+    return this.firstPerson;
+  }
+
   update(dt, getFloorY) {
     const inp = this.input;
+
+    // --- scroll wheel pulls the camera in and out ---
+    const wh = inp.consumeWheel ? inp.consumeWheel() : 0;
+    if (wh) {
+      this.camZoom = THREE.MathUtils.clamp(
+        this.camZoom * Math.exp(wh * 0.0011), 0.25, 3.0);
+    }
 
     // ---- look input: mouse + keys, both fed through the same smoother ----
     const [mdx, mdy] = inp.consumeMouse();
@@ -64,10 +95,17 @@ export class Player {
     if (inp.down('ArrowUp')) pitchInput += kTurn * dt * 0.7;
     if (inp.down('ArrowDown')) pitchInput -= kTurn * dt * 0.7;
 
-    // critically-damped smoothing: sharp response, no jitter, no overshoot
-    const smooth = 1 - Math.exp(-12 * dt);
+    // Critically-damped smoothing. The rate is the animal's agility, so a
+    // whale takes roughly a second to commit to a turn and just as long to
+    // come out of it, while a small fish responds almost instantly.
+    const smooth = 1 - Math.exp(-this.agility * dt);
     this._yawVel += (yawInput - this._yawVel) * smooth;
     this._pitchVel += (pitchInput - this._pitchVel) * smooth;
+
+    // cap angular velocity — big bodies simply cannot rotate quickly
+    const cap = this.maxTurn * dt;
+    this._yawVel = THREE.MathUtils.clamp(this._yawVel, -cap, cap);
+    this._pitchVel = THREE.MathUtils.clamp(this._pitchVel, -cap * 0.7, cap * 0.7);
 
     this.yaw += this._yawVel;
     this.pitch = THREE.MathUtils.clamp(this.pitch + this._pitchVel, -MAX_PITCH, MAX_PITCH);
@@ -89,11 +127,13 @@ export class Player {
     if (inp.down('Space')) desiredVel.y += this.cruise * 0.65;
     if (inp.down('ControlLeft') || inp.down('KeyC')) desiredVel.y -= this.cruise * 0.65;
 
-    // snappy acceleration, gentle glide when you let go (no "molasses" feel)
-    const accel = 1 - Math.exp(-6 * dt);
+    // Acceleration and coasting scale with mass: a whale takes time to get
+    // going and then glides a long way; a clownfish starts and stops at once.
+    const accel = 1 - Math.exp(-this.thrustLag * dt);
     this.vel.lerp(desiredVel, accel);
     if (speed === 0 && !inp.down('Space') && !inp.down('KeyC')) {
-      this.vel.multiplyScalar(1 - Math.min(0.6, dt * 0.7));   // slow coast
+      const drag = 0.7 * Math.min(1, 2.4 / Math.pow(this.species.length, 0.4));
+      this.vel.multiplyScalar(1 - Math.min(0.6, dt * drag));
     }
 
     this.mesh.position.addScaledVector(this.vel, dt);
@@ -112,12 +152,13 @@ export class Player {
     }
 
     // ---- banking: driven by TURN RATE, auto-levels to 0 ----
-    const targetRoll = THREE.MathUtils.clamp(this._yawVel * 9, -0.45, 0.45);
-    this.roll += (targetRoll - this.roll) * Math.min(1, dt * 3.5);
+    const rollGain = 9 * (this.bankAmount / 0.45);
+    const targetRoll = THREE.MathUtils.clamp(this._yawVel * rollGain, -this.bankAmount, this.bankAmount);
+    this.roll += (targetRoll - this.roll) * Math.min(1, dt * (1.2 + this.agility * 0.2));
 
     _e.set(this.pitch, this.yaw, this.roll, 'YXZ');
     _q.setFromEuler(_e);
-    this.mesh.quaternion.slerp(_q, Math.min(1, dt * 9));
+    this.mesh.quaternion.slerp(_q, Math.min(1, dt * (2.5 + this.agility * 0.5)));
 
     const speed01 = THREE.MathUtils.clamp(this.vel.length() / this.cruise, 0.15, 1);
     animateCreature(this.mesh, dt, speed01);
@@ -133,6 +174,23 @@ export class Player {
   }
 
   _updateCamera(dt, instant) {
+    if (this.firstPerson) {
+      // Sit at the animal's eye, looking where it looks.
+      const L = this.species.length;
+      const fwd = new THREE.Vector3(
+        Math.sin(this.yaw) * Math.cos(this.pitch),
+        Math.sin(this.pitch),
+        Math.cos(this.yaw) * Math.cos(this.pitch)
+      ).normalize();
+      this.camera.position.copy(this.mesh.position)
+        .addScaledVector(fwd, L * 0.46)
+        .add(new THREE.Vector3(0, L * 0.04, 0));
+      _camTarget.copy(this.camera.position).addScaledVector(fwd, L * 4 + 10);
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(_camTarget);
+      return;
+    }
+
     // Camera angles chase the body with a lag -> stable horizon, no whip.
     const chase = instant ? 1 : 1 - Math.exp(-5 * dt);
     let dYaw = this.yaw - this.camYaw;
@@ -149,8 +207,8 @@ export class Player {
     ).normalize();
 
     _desiredCamPos.copy(this.mesh.position)
-      .addScaledVector(back, this.camDist)
-      .add(new THREE.Vector3(0, this.camHigh, 0));
+      .addScaledVector(back, this.camDist * this.camZoom)
+      .add(new THREE.Vector3(0, this.camHigh * this.camZoom, 0));
 
     if (instant) this.camera.position.copy(_desiredCamPos);
     else this.camera.position.lerp(_desiredCamPos, 1 - Math.exp(-7 * dt));
