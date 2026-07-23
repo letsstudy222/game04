@@ -13,6 +13,8 @@
 // Convention: long axis = +Z. Head at +0.5, tail at -0.5, unit length ~1.
 
 import * as THREE from 'three';
+import { buildBlueWhale, animateWhale } from './whale.js';
+import { buildSwimmer, animateSwimmer } from './swimmers.js';
 
 /* ------------------------------------------------------------------ utils */
 
@@ -1027,6 +1029,14 @@ function buildCrab(sp, root) {
 /* --------------------------------------------------------------- public */
 
 export function buildCreature(species) {
+  // Continuous-surface builds. These apply their own scaling, so return early.
+  if (species.shape === 'whale') return buildBlueWhale(species);
+  const SWIM = {
+    shark: 'shark', dolphin: 'dolphin', porpoise: 'porpoise',
+    tuna: 'tuna', fish: 'reeffish',
+  }[species.shape];
+  if (SWIM) return buildSwimmer(species, SWIM);
+
   const root = new THREE.Group();
   let built;
   switch (species.shape) {
@@ -1065,6 +1075,8 @@ export function buildCreature(species) {
 export function animateCreature(root, dt, speed01 = 1) {
   const a = root._anim;
   if (!a) return;
+  if (a.kind === 'whaleSpine') { animateWhale(root, dt, speed01); return; }
+  if (a.kind === 'spineSide' || a.kind === 'spineVert') { animateSwimmer(root, dt, speed01); return; }
   a.t += dt * (0.55 + speed01 * a.freq);
   const s = Math.sin(a.t * Math.PI * 2);
 

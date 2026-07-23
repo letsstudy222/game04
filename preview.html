@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ABYSSAL — Xem mô hình 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<style>
+:root{--abyss:#04141d;--foam:#eaf3f4;--bio:#57e3c9;--slate:#7fa6b0;--hair:rgba(120,200,210,.18);--panel:rgba(6,26,34,.66)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--abyss);font-family:'Space Grotesk',system-ui,sans-serif;color:var(--foam)}
+canvas{display:block}
+#ui{position:fixed;top:18px;left:18px;z-index:5;background:var(--panel);backdrop-filter:blur(10px);
+  border:1px solid var(--hair);border-radius:16px;padding:18px 20px;max-width:290px}
+h1{font-family:'Fraunces',serif;font-size:26px;font-weight:600;line-height:1.05;margin-bottom:2px}
+.sci{color:var(--slate);font-size:12px;font-style:italic;margin-bottom:14px}
+.row{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--hair)}
+.row:last-of-type{border:none}
+.row span{color:var(--slate)}
+.row b{font-weight:600}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+button{background:rgba(87,227,201,.1);border:1px solid var(--bio);color:var(--bio);
+  border-radius:9px;padding:7px 13px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
+button:hover{background:rgba(87,227,201,.22)}
+button.off{border-color:var(--hair);color:var(--slate);background:transparent}
+select{width:100%;margin-top:12px;background:rgba(255,255,255,.05);border:1px solid var(--hair);
+  color:var(--foam);border-radius:9px;padding:8px 10px;font-family:inherit;font-size:13px;cursor:pointer}
+#hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:5;background:var(--panel);
+  backdrop-filter:blur(8px);border:1px solid var(--hair);border-radius:999px;padding:9px 20px;
+  font-size:12.5px;color:var(--slate)}
+#hint b{color:var(--foam)}
+#scalebar{position:fixed;right:18px;bottom:18px;z-index:5;background:var(--panel);backdrop-filter:blur(8px);
+  border:1px solid var(--hair);border-radius:12px;padding:12px 16px;font-size:12px;color:var(--slate);text-align:right}
+#scalebar b{color:var(--bio);font-size:15px}
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1 id="pname">Cá voi xanh</h1>
+  <p class="sci" id="psci">Balaenoptera musculus</p>
+  <div class="row"><span>Chiều dài</span><b id="plen">28 m</b></div>
+  <div class="row"><span>Sải vây ngực</span><b id="pspan">—</b></div>
+  <div class="row"><span>Chiều cao thân</span><b id="phigh">—</b></div>
+  <div class="row"><span>Số tam giác</span><b id="ptri">—</b></div>
+  <select id="psel"></select>
+  <div class="btns">
+    <button id="bspin">Tự xoay: BẬT</button>
+    <button id="bwire" class="off">Lưới</button>
+    <button id="bdiver">Thợ lặn</button>
+    <button id="bswim">Bơi: BẬT</button>
+  </div>
+</div>
+<div id="scalebar">so sánh với thợ lặn<br><b>1,8 m</b></div>
+<div id="hint">Kéo chuột để <b>xoay</b> · Lăn chuột để <b>phóng to</b> · Chuột phải để <b>di chuyển</b></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildCreature, animateCreature } from './src/entities/fishMesh.js';
+import { SPECIES, SPECIES_ORDER, ALL_SPECIES } from './src/data/species.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x07202c);
+scene.fog = new THREE.Fog(0x07202c, 60, 400);
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.05, 3000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+
+// Studio-ish underwater rig
+scene.add(new THREE.HemisphereLight(0xbfe8f7, 0x0b2430, 1.0));
+const key = new THREE.DirectionalLight(0xdff2ff, 2.0); key.position.set(-40, 60, 34); scene.add(key);
+const rim = new THREE.DirectionalLight(0x7fd7c9, 1.2); rim.position.set(48, 14, -46); scene.add(rim);
+const fill = new THREE.DirectionalLight(0x4a7fa0, 0.7); fill.position.set(20, -40, 20); scene.add(fill);
+
+// 1.8 m diver for scale
+function makeDiver() {
+  const g = new THREE.Group();
+  const suit = new THREE.MeshStandardMaterial({ color: 0x1b1f26, roughness: .8 });
+  const gear = new THREE.MeshStandardMaterial({ color: 0xf0b429, roughness: .6 });
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(.17, .15, .62, 12), suit);
+  torso.rotation.x = Math.PI / 2; g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.12, 14, 12), suit);
+  head.position.z = .42; g.add(head);
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .5, 12), gear);
+  tank.rotation.x = Math.PI / 2; tank.position.set(0, .2, -.02); g.add(tank);
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(.05, .045, .55, 8), suit);
+    arm.rotation.x = Math.PI / 2; arm.position.set(s * .2, 0, .1); g.add(arm);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(.06, .05, .72, 8), suit);
+    leg.rotation.x = Math.PI / 2; leg.position.set(s * .09, 0, -.62); g.add(leg);
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(.16, .03, .32), gear);
+    fin.position.set(s * .09, 0, -1.06); g.add(fin);
+  }
+  return g;
+}
+const diver = makeDiver();
+scene.add(diver);
+
+let current = null, currentId = 'blue_whale';
+let spin = true, swim = true, wire = false, showDiver = true;
+
+const sel = document.getElementById('psel');
+for (const id of ALL_SPECIES) {
+  const o = document.createElement('option');
+  o.value = id; o.textContent = `${SPECIES[id].viet} — ${SPECIES[id].length < 1
+    ? Math.round(SPECIES[id].length * 100) + ' cm' : SPECIES[id].length + ' m'}`;
+  sel.appendChild(o);
+}
+sel.value = currentId;
+
+function load(id) {
+  if (current) { scene.remove(current); }
+  currentId = id;
+  const sp = SPECIES[id];
+  current = buildCreature(sp);
+  scene.add(current);
+  applyWire();
+
+  const box = new THREE.Box3().setFromObject(current);
+  const size = box.getSize(new THREE.Vector3());
+  const c = box.getCenter(new THREE.Vector3());
+  let tris = 0;
+  current.traverse(o => { if (o.isMesh && o.geometry.index) tris += o.geometry.index.count / 3; });
+
+  document.getElementById('pname').textContent = sp.viet;
+  document.getElementById('psci').textContent = sp.scientific;
+  document.getElementById('plen').textContent = sp.length < 1
+    ? Math.round(sp.length * 100) + ' cm' : sp.length + ' m';
+  document.getElementById('pspan').textContent = size.x.toFixed(2) + ' m';
+  document.getElementById('phigh').textContent = size.y.toFixed(2) + ' m';
+  document.getElementById('ptri').textContent = Math.round(tris).toLocaleString('vi-VN');
+
+  const r = Math.max(size.x, size.y, size.z);
+  camera.position.set(r * 0.75, r * 0.3, r * 1.5);
+  controls.target.copy(c);
+  controls.update();
+  scene.fog.near = r * 2; scene.fog.far = r * 12;
+
+  diver.position.set(0, -size.y * 0.9 - 1.5, -r * 0.25);
+  diver.visible = showDiver && r > 3;
+}
+sel.addEventListener('change', () => load(sel.value));
+
+function applyWire() {
+  if (!current) return;
+  current.traverse(o => { if (o.isMesh) o.material.wireframe = wire; });
+}
+document.getElementById('bspin').onclick = e => {
+  spin = !spin; e.target.textContent = 'Tự xoay: ' + (spin ? 'BẬT' : 'TẮT');
+  e.target.classList.toggle('off', !spin);
+};
+document.getElementById('bswim').onclick = e => {
+  swim = !swim; e.target.textContent = 'Bơi: ' + (swim ? 'BẬT' : 'TẮT');
+  e.target.classList.toggle('off', !swim);
+};
+document.getElementById('bwire').onclick = e => {
+  wire = !wire; e.target.classList.toggle('off', !wire); applyWire();
+};
+document.getElementById('bdiver').onclick = e => {
+  showDiver = !showDiver; diver.visible = showDiver;
+  e.target.classList.toggle('off', !showDiver);
+};
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+load(currentId);
+const clock = new THREE.Clock();
+(function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, clock.getDelta());
+  if (current) {
+    if (swim) animateCreature(current, dt, 0.85);
+    if (spin) current.rotation.y += dt * 0.22;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

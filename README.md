@@ -112,6 +112,11 @@ Tất cả nằm trong `src/config.js`: `chunk.renderRadius` (tầm nhìn — gi
 ---
 
 ## ✨ Có gì trong thế giới
+- **Sinh vật dựng theo giải phẫu thật:** mỗi loài lớn là **một mặt cong liền mạch** có tiết diện biến đổi dọc thân (đầu bẹt rộng → giữa tròn đầy → cuống đuôi dẹt đứng), không phải các khối hình ghép lại. Chi tiết da (rãnh bụng cá voi, khe mang cá mập, vạch cá hề, vân vảy) được **sinh bằng thuật toán vào texture** — không dùng file ảnh nào, nên sắc nét mà vẫn nhẹ.
+- **Mắt thật:** nhãn cầu sẫm lắp chìm gần phẳng với đầu, vành mống mắt mỏng theo từng loài (cá hề vàng cam, cá ngừ vàng đồng, cá mập gần đen), kèm một chấm sáng ướt.
+- **Thân uốn theo sóng lan truyền:** cá và cá mập lượn ngang, cá voi và cá heo nhấp nhô dọc — đúng cơ chế bơi của từng nhóm sinh vật.
+- **Một hệ ánh sáng duy nhất** (`src/core/lighting.js`) dùng chung cho game và bộ render duyệt mẫu, nên hình trong game giống hệt ảnh đã duyệt.
+
 - **Mô hình 3D theo giải phẫu thật:** mỗi loài có đường viền thân (profile) dựng từ tỉ lệ cơ thể thật, không dùng khuôn chung. Cá voi xanh có **rãnh bụng (ventral pleats)**, mõm bẹt hình chữ U, lỗ thở kèm gờ chắn nước, vây lưng nhỏ đặt lùi 72% thân, đuôi hai thùy có khía giữa. Cá mập trắng có **5 khe mang**, hàm răng nhọn, đuôi lưỡi liềm lệch. Cá heo có **melon** (trán tròn) và mỏ; vaquita có quầng mắt đen đặc trưng. Mực khổng lồ có 8 tay + 2 xúc tu nhiều đốt uốn lượn.
 - **Ngụy trang phản bóng (countershading):** mọi loài đậm màu ở lưng, nhạt dần xuống bụng — bằng vertex color, không tốn texture.
 - **Thân dẹt hai bên đúng thật:** cá không có tiết diện tròn; cá hề rộng 5,5cm × cao 6,3cm.

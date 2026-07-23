@@ -14,6 +14,7 @@ import { Journal, ACHIEVEMENTS } from './core/journal.js';
 import { Toasts } from './ui/toast.js';
 import { renderJournal } from './ui/journalPanel.js';
 import { Minimap } from './ui/minimap.js';
+import { buildRig } from './core/lighting.js';
 import { renderEncyclopedia } from './ui/encyclopedia.js';
 import { BIOME_DEF } from './world/biomes.js';
 import { SPECIES_ORDER } from './data/species.js';
@@ -37,20 +38,15 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Filmic tone mapping: rolls highlights off gently -> much softer look
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.15;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
   CONFIG.camera.fov, window.innerWidth / window.innerHeight, CONFIG.camera.near, CONFIG.camera.far
 );
 
-// --- lights (underwater feel) ---
-const sun = new THREE.DirectionalLight(0xcdeeff, 1.1);
-sun.position.set(60, 200, 40);
-scene.add(sun);
-const hemi = new THREE.HemisphereLight(0x9fd8ef, 0x0a1a22, 0.7);
-scene.add(hemi);
-scene.add(new THREE.AmbientLight(0x335566, 0.4));
+// --- lights: the exact rig models are reviewed under (see core/lighting.js) ---
+const rig = buildRig(THREE, scene);
 
 const ocean = new Ocean(scene);
 const chunks = new ChunkManager(scene);
@@ -316,8 +312,7 @@ function animate() {
   if (dt > 0) adaptQuality(dt);
 
   const daylight = daylightAt(time);
-  sun.intensity = 0.12 + 0.82 * daylight;      // gentler direct sun
-  hemi.intensity = 0.3 + 0.55 * daylight;      // more ambient fill -> softer shadows
+  rig.setDaylight(daylight);
 
   if (state === 'playing' && player) {
     player.update(dt, (x, z) => chunks.getFloorY(x, z));
