@@ -1061,7 +1061,8 @@ export function buildCreature(species, variant = Math.random(), detail = 'med') 
   }
   const ODD = { ray: 'ray', turtle: 'turtle', sunfish: 'sunfish',
                 squid: 'squid', angler: 'angler', snake: 'snake',
-                star: 'star', crab: 'crab' }[species.shape];
+                star: 'star', crab: 'crab', dugong: 'dugong',
+                seahorse: 'seahorse', cucumber: 'cucumber' }[species.shape];
   if (ODD) return litSkin(buildOddity(species, ODD, { variant, detail }));
 
   const root = new THREE.Group();
@@ -1110,8 +1111,8 @@ export function animateCreature(root, dt, speed01 = 1) {
     (root._bodyLength !== undefined ? animateOddity : animateSwimmer)(root, dt, speed01);
     return;
   }
-  if (['wingwave', 'flipperFlap', 'sunScull', 'jetArms', 'starCurl', 'scuttle']
-      .includes(a.kind)) {
+  if (['wingwave', 'flipperFlap', 'sunScull', 'jetArms', 'starCurl', 'scuttle',
+       'seahorseHover'].includes(a.kind)) {
     animateOddity(root, dt, speed01); return;
   }
   a.t += dt * (0.55 + speed01 * a.freq);

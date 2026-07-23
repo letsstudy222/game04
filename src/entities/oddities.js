@@ -701,6 +701,266 @@ export const ODD_PLANS = {
     },
   },
 
+
+  /* ------------------------------------------------------------------ DUGONG */
+  dugong: {
+    // A sirenian, not a cetacean: no dorsal fin, no hind limbs, a blunt
+    // down-turned muzzle carrying the horseshoe grazing disc, and a fluked
+    // tail it beats vertically at a slow ~10 km/h.
+    bodyLength: 1.0,
+    norm: (L) => L / 1.0,
+    stations: [
+      { t: 0.00, w: 0.085, hTop: 0.080, hBot: 0.086, yOff: -0.012 },
+      { t: 0.06, w: 0.125, hTop: 0.115, hBot: 0.124, yOff: -0.008 },
+      { t: 0.14, w: 0.158, hTop: 0.150, hBot: 0.158, yOff: -0.003 },
+      { t: 0.26, w: 0.182, hTop: 0.176, hBot: 0.182, yOff: 0 },
+      { t: 0.38, w: 0.188, hTop: 0.182, hBot: 0.186, yOff: 0 },
+      { t: 0.52, w: 0.178, hTop: 0.172, hBot: 0.172, yOff: 0 },
+      { t: 0.66, w: 0.152, hTop: 0.148, hBot: 0.144, yOff: 0 },
+      { t: 0.78, w: 0.118, hTop: 0.118, hBot: 0.110, yOff: 0 },
+      { t: 0.87, w: 0.082, hTop: 0.088, hBot: 0.078, yOff: 0 },
+      { t: 0.94, w: 0.048, hTop: 0.058, hBot: 0.048, yOff: 0 },
+      { t: 1.00, w: 0.022, hTop: 0.030, hBot: 0.024, yOff: 0 },
+    ],
+    anim: { kind: 'spineVert', freq: 0.7, amp: 0.030, bendFrom: 0.42, wave: 0.85 },
+    skin(u, v) {
+      const s = Math.sin(u * Math.PI * 2);
+      const up = (s + 1) * 0.5;
+      _c.set(0xa39c8b).lerp(new THREE.Color(0x6d675a), ss(0.35, 0.95, up));
+      if (up < 0.3) _c.lerp(new THREE.Color(0xc7c1b0), (0.3 - up) * 2.4);
+      // thick creased hide with scattered scars, as older dugongs carry
+      const grain = mottle(v * 70, u * 30);
+      _c.offsetHSL(0, 0, (grain - 0.5) * 0.10);
+      const scar = mottle(v * 24 + 9, u * 11);
+      if (scar > 0.83) _c.lerp(new THREE.Color(0xd6d0c0), (scar - 0.83) * 2.2);
+      // the grazing disc: a broad pale horseshoe on the down-turned muzzle
+      if (v < 0.075 && s < 0.25) _c.lerp(new THREE.Color(0x8b8271), 0.55);
+      // mouth line under the muzzle
+      if (v < 0.10) {
+        const d = Math.abs(s + 0.55);
+        _c.multiplyScalar(1 - Math.exp(-(d * d) / 0.02) * 0.45);
+      }
+      return [_c.r, _c.g, _c.b];
+    },
+    bump: (u, v) => 0.55 + (mottle(v * 85, u * 36) - 0.5) * 0.16,
+    groove(t, th) {
+      const s = Math.sin(th);
+      // muzzle turns down at the front — the sirenian signature
+      if (t < 0.11 && s > 0.2) return Math.pow(s, 3) * 0.16 * (1 - ss(0.06, 0.11, t));
+      if (t > 0.86) return -Math.pow(Math.abs(Math.cos(th)), 8) * 0.18 * ss(0.86, 0.96, t);
+      return 0;
+    },
+    parts(root, sp) {
+      const P = ODD_PLANS.dugong;
+      const fm = vcFin();
+      const mk = (o, th, tp) => new THREE.Mesh(
+        foilShaded(o, th, tp, 0x8b8474, 0x5d5749), fm);
+      const zAt = (t) => 0.5 - t;
+      // paddle-shaped pectoral flippers, ~15% of body length, set well forward
+      for (const s of [-1, 1]) {
+        const surf = surfaceAt(P, 0.20, 'w');
+        const f = mk([
+          [0.000, 0.050], [0.060, 0.026], [0.135, -0.045],
+          [0.100, -0.078], [0.040, -0.060], [0.006, -0.028],
+        ], 0.010, 0.25);
+        f.scale.x = s;
+        f.position.set(s * (surf - 0.02), -0.055, zAt(0.20));
+        f.rotation.z = s * -0.18;
+        f.rotation.x = 0.20;
+        root.add(f);
+      }
+      // horizontal fluke — dolphin-like, which separates dugong from manatee
+      const tail = new THREE.Group();
+      tail.position.z = zAt(0.94);
+      root.add(tail);
+      for (const s of [-1, 1]) {
+        const fk = new THREE.Mesh(foilShaded([
+          [0.000, 0.030], [0.070, 0.018], [0.150, -0.020],
+          [0.195, -0.080], [0.130, -0.082], [0.050, -0.050], [0.000, -0.020],
+        ], 0.008, 0.22, 0x7d7768, 0x4f4a3e), fm);
+        fk.scale.x = s;
+        fk.position.z = -0.055;
+        tail.add(fk);
+      }
+      root._tail = tail;
+      // bristled grazing disc on the muzzle
+      const disc = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10),
+        new THREE.MeshStandardMaterial({ color: 0x7f7867, roughness: 0.95 }));
+      disc.scale.set(1.15, 0.65, 0.55);
+      disc.position.set(0, -0.055, zAt(0.03));
+      root.add(disc);
+      eyes(root, { r: 0.017, x: surfaceAt(P, 0.11, 'w') - 0.006,
+                   y: 0.030, z: zAt(0.11), iris: 0x3c3529 });
+    },
+  },
+
+  /* ---------------------------------------------------------------- SEAHORSE */
+  seahorse: {
+    // Upright, bony-ringed, no caudal fin. The body is modelled along its own
+    // axis and then stood on end, because a seahorse swims vertically.
+    bodyLength: 1.0,
+    norm: (L) => L / 1.15,
+    stations: [
+      { t: 0.00, w: 0.075, hTop: 0.085, hBot: 0.075, yOff: 0 },   // snout base
+      { t: 0.10, w: 0.105, hTop: 0.120, hBot: 0.100, yOff: 0 },   // head
+      { t: 0.18, w: 0.085, hTop: 0.098, hBot: 0.082, yOff: 0 },   // neck
+      { t: 0.30, w: 0.120, hTop: 0.150, hBot: 0.118, yOff: 0 },   // chest/belly
+      { t: 0.42, w: 0.118, hTop: 0.148, hBot: 0.120, yOff: 0 },
+      { t: 0.55, w: 0.098, hTop: 0.118, hBot: 0.098, yOff: 0 },
+      { t: 0.68, w: 0.072, hTop: 0.082, hBot: 0.070, yOff: 0 },
+      { t: 0.80, w: 0.050, hTop: 0.056, hBot: 0.048, yOff: 0 },
+      { t: 0.90, w: 0.032, hTop: 0.035, hBot: 0.030, yOff: 0 },
+      { t: 1.00, w: 0.016, hTop: 0.018, hBot: 0.015, yOff: 0 },
+    ],
+    anim: { kind: 'seahorseHover', freq: 1.0, amp: 1 },
+    skin(u, v, sp) {
+      const s = Math.sin(u * Math.PI * 2);
+      const up = (s + 1) * 0.5;
+      _c.set(sp.colors.body).lerp(new THREE.Color(sp.colors.belly || 0xf2e2ad), up * 0.35);
+      // the bony rings that ring the body every few millimetres
+      const ring = Math.pow(Math.abs(Math.cos(v * Math.PI * 22)), 5);
+      _c.lerp(new THREE.Color(sp.colors.fin || 0xefd68a), ring * 0.45);
+      // large dark spots, the species' name
+      const spot = mottle(v * 34, u * 15);
+      if (spot > 0.72) _c.lerp(new THREE.Color(sp.colors.band || 0x6b4a18), (spot - 0.72) * 2.4);
+      _c.offsetHSL(0, 0, (mottle(v * 140, u * 60) - 0.5) * 0.08);
+      return [_c.r, _c.g, _c.b];
+    },
+    bump(u, v) {
+      const ring = Math.pow(Math.abs(Math.cos(v * Math.PI * 22)), 5);
+      return 0.5 + ring * 0.42 + (mottle(v * 150, u * 64) - 0.5) * 0.08;
+    },
+    groove(t, th) {
+      // ring segmentation carved shallowly into the armour
+      return Math.pow(Math.abs(Math.cos(t * Math.PI * 22)), 6) * 0.05;
+    },
+    parts(root, sp) {
+      const P = ODD_PLANS.seahorse;
+      const zAt = (t) => 0.5 - t;
+      const body = new THREE.MeshStandardMaterial({ color: sp.colors.body, roughness: 0.75 });
+      const fm = vcFin();
+      // tubular snout
+      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.042, 0.20, 9), body);
+      snout.rotation.x = Math.PI / 2;
+      snout.position.set(0, -0.010, zAt(0.0) + 0.10);
+      root.add(snout);
+      // coronet on top of the head
+      const cor = new THREE.Mesh(new THREE.ConeGeometry(0.040, 0.075, 6), body);
+      cor.position.set(0, 0.120, zAt(0.10));
+      root.add(cor);
+      // dorsal fin — the only real propulsion, flutters ~35 times a second
+      const dors = new THREE.Mesh(foilShaded([
+        [0, 0.085], [0.055, 0.055], [0.070, -0.050], [0.008, -0.090],
+      ], 0.004, 0.35, sp.colors.fin || 0xefd68a, sp.colors.band || 0x6b4a18), fm);
+      dors.rotation.z = Math.PI / 2;
+      dors.position.set(0, surfaceAt(P, 0.48, 'hTop') - 0.01, zAt(0.48));
+      root.add(dors);
+      root._dorsal = dors;
+      for (const s of [-1, 1]) {
+        const pf = new THREE.Mesh(foilShaded([
+          [0, 0.030], [0.040, 0.010], [0.050, -0.030], [0.006, -0.036],
+        ], 0.003, 0.35, sp.colors.fin || 0xefd68a, sp.colors.band || 0x6b4a18), fm);
+        pf.scale.x = s;
+        pf.position.set(s * (surfaceAt(P, 0.16, 'w') - 0.006), 0.010, zAt(0.16));
+        root.add(pf);
+      }
+      // prehensile tail curl — modelled as a tapering spiral
+      const curl = new THREE.Group();
+      curl.position.z = zAt(0.86);
+      root.add(curl);
+      let prev = new THREE.Vector3(0, 0, 0);
+      for (let i = 1; i <= 7; i++) {
+        const a = i * 0.85;
+        const r = 0.075 * (1 - i / 9);
+        const p = new THREE.Vector3(0, -0.055 - Math.sin(a) * r, -0.05 - (1 - Math.cos(a)) * r);
+        const d = p.clone().sub(prev);
+        const seg = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.030 - i * 0.003, 0.034 - i * 0.003, d.length() * 1.15, 7), body);
+        seg.position.copy(prev).lerp(p, 0.5);
+        seg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize());
+        curl.add(seg);
+        prev = p;
+      }
+      eyes(root, { r: 0.030, x: surfaceAt(P, 0.10, 'w') - 0.008,
+                   y: 0.040, z: zAt(0.10), iris: 0x8a6a2c });
+      // a seahorse holds itself upright
+      root.rotation.x = -Math.PI / 2 + 0.25;
+    },
+  },
+
+  /* ----------------------------------------------------------- SEA CUCUMBER */
+  cucumber: {
+    // Arched dorsally, flattened ventrally — a semicircular cross-section
+    // pressed to the seabed, which is why yScale squashes the underside.
+    bodyLength: 1.0,
+    norm: (L) => L / 1.0,
+    stations: [
+      { t: 0.00, w: 0.055, hTop: 0.050, hBot: 0.030, yOff: 0 },
+      { t: 0.09, w: 0.098, hTop: 0.090, hBot: 0.042, yOff: 0 },
+      { t: 0.22, w: 0.125, hTop: 0.116, hBot: 0.050, yOff: 0 },
+      { t: 0.38, w: 0.136, hTop: 0.128, hBot: 0.054, yOff: 0 },
+      { t: 0.55, w: 0.133, hTop: 0.124, hBot: 0.052, yOff: 0 },
+      { t: 0.70, w: 0.118, hTop: 0.110, hBot: 0.046, yOff: 0 },
+      { t: 0.84, w: 0.090, hTop: 0.082, hBot: 0.036, yOff: 0 },
+      { t: 0.93, w: 0.060, hTop: 0.054, hBot: 0.026, yOff: 0 },
+      { t: 1.00, w: 0.030, hTop: 0.026, hBot: 0.014, yOff: 0 },
+    ],
+    yScale: (t, ct) => 0.70 + 0.30 * Math.exp(-Math.pow(ct / 0.9, 2)),
+    anim: { kind: 'still', freq: 0.15, amp: 0.01 },
+    skin(u, v, sp) {
+      const s = Math.sin(u * Math.PI * 2);
+      const up = (s + 1) * 0.5;
+      _c.set(sp.colors.body).lerp(new THREE.Color(sp.colors.belly || 0x9c917f), 1 - up);
+      // grey cross-banding on the dark dorsal surface
+      if (up > 0.45) {
+        const band = Math.pow(Math.abs(Math.cos(v * Math.PI * 9)), 3);
+        _c.lerp(new THREE.Color(0x8b8172), band * 0.35 * (up - 0.45) * 2);
+      }
+      // papillae speckling the back
+      const pap = mottle(v * 60, u * 26);
+      if (pap > 0.74 && up > 0.5) _c.lerp(new THREE.Color(sp.colors.band || 0x2b2723), (pap - 0.74) * 2.6);
+      _c.offsetHSL(0, 0, (mottle(v * 170, u * 72) - 0.5) * 0.09);
+      return [_c.r, _c.g, _c.b];
+    },
+    bump: (u, v) => 0.55 + (mottle(v * 65, u * 28) - 0.5) * 0.28,
+    groove: () => 0,
+    parts(root, sp) {
+      const P = ODD_PLANS.cucumber;
+      const zAt = (t) => 0.5 - t;
+      const dark = new THREE.MeshStandardMaterial({ color: sp.colors.band || 0x2b2723, roughness: 1 });
+      const pale = new THREE.MeshStandardMaterial({ color: sp.colors.belly || 0x9c917f, roughness: 0.9 });
+      // ~20 short feeding tentacles ringing the ventral mouth
+      for (let i = 0; i < 20; i++) {
+        const a = (i / 20) * Math.PI * 2;
+        const t = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.055, 5), pale);
+        t.position.set(Math.cos(a) * 0.045, -0.030 + Math.sin(a) * 0.020, zAt(0.02) + 0.02);
+        t.rotation.x = Math.PI / 2 + 0.5;
+        t.rotation.z = -a;
+        root.add(t);
+      }
+      // dorsal papillae as real bumps
+      for (let i = 0; i < 26; i++) {
+        const t = 0.10 + Math.random() * 0.80;
+        const side = (Math.random() - 0.5) * 1.4;
+        const h = surfaceAt(P, t, 'hTop');
+        const w = surfaceAt(P, t, 'w');
+        const p = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.040, 5), dark);
+        p.position.set(Math.sin(side) * w * 0.7, Math.cos(side) * h * 0.9, zAt(t));
+        p.rotation.z = -side;
+        root.add(p);
+      }
+      // tube feet along the sole
+      for (let i = 0; i < 18; i++) {
+        const t = 0.12 + (i / 18) * 0.76;
+        for (const s of [-1, 1]) {
+          const f = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.030, 5), pale);
+          f.position.set(s * surfaceAt(P, t, 'w') * 0.55, -surfaceAt(P, t, 'hBot') * 0.85, zAt(t));
+          root.add(f);
+        }
+      }
+    },
+  },
+
   /* --------------------------------------------------------------- STARFISH */
   star: {
     custom: 'star',
@@ -1127,6 +1387,12 @@ export function animateOddity(root, dt, speed01 = 1) {
         arm.mesh.rotation.x = Math.sin(a.t * Math.PI * 2 + arm.phase) * arm.amp;
         arm.mesh.rotation.y = Math.cos(a.t * Math.PI * 1.4 + arm.phase * 0.7) * arm.amp * 0.7;
       }
+      break;
+    }
+    case 'seahorseHover': {
+      // the dorsal fin blurs; the whole animal bobs gently on the current
+      if (root._dorsal) root._dorsal.rotation.y = Math.sin(a.t * 42) * 0.35;
+      root.position.y += Math.sin(a.t * Math.PI * 2 * 0.5) * 0.0015;
       break;
     }
     case 'spineSide': {

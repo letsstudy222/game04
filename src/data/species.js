@@ -345,6 +345,184 @@ export const SPECIES = {
     },
   },
 
+
+  // ================= MANGROVE FOREST =================
+  mudskipper: {
+    id: 'mudskipper', name: 'Giant Mudskipper',
+    viet: 'Cá thòi lòi', scientific: 'Periophthalmodon schlosseri',
+    length: 0.25, shape: 'fish',
+    colors: { body: 0x6a5c3f, band: 0x3d3626, fin: 0x8a7a55, belly: 0xc9bb96 },
+    homeBiome: 'mangrove', spawnBiomes: ['mangrove'],
+    depth: [-0.3, -2], schooling: false, speedFactor: 0.5,
+    info: {
+      habitat: 'Bãi bùn triều trong rừng ngập mặn Ấn Độ Dương – Tây Thái Bình Dương',
+      fact: 'Thở qua da và khoang miệng, sống trên cạn hơn 90% thời gian, "đi bộ" bằng vây ngực.',
+    },
+    wiki: {
+      weight: '~60–120 g', lifespan: '~5 năm',
+      diet: 'Cua nhỏ, động vật không xương, côn trùng, tảo',
+      status: 'LC', depthRange: '0–2 m',
+      records: 'Loài cá lưỡng cư thực thụ — đào hang trong bùn yếm khí và giữ túi khí bên trong.',
+      body: 'Cá thòi lòi có đôi mắt lồi như kính tiềm vọng đặt trên đỉnh đầu, thụt xuống được để giữ ẩm, cho tầm nhìn gần như toàn cảnh cả trên lẫn dưới nước. Vây ngực khỏe như cánh tay giúp nó chống người bò và nhảy trên mặt bùn. Chúng cực kỳ lãnh thổ: dựng vây lưng như cánh buồm để ra oai với con đực khác. Hang của chúng thông xuống lớp bùn không có oxy, nên chúng ngậm khí xuống bơm vào hang cho trứng thở.',
+    },
+  },
+  archerfish: {
+    id: 'archerfish', name: 'Banded Archerfish',
+    viet: 'Cá măng bắn nước', scientific: 'Toxotes jaculatrix',
+    length: 0.22, shape: 'fish',
+    colors: { body: 0xdfe4e6, band: 0x24262b, fin: 0xb9c2c6, belly: 0xf2f5f5 },
+    homeBiome: 'mangrove', spawnBiomes: ['mangrove'],
+    depth: [-0.2, -1.5], schooling: true, schoolSize: [4, 9], speedFactor: 0.7,
+    info: {
+      habitat: 'Cửa sông nước lợ và rừng ngập mặn, ngay dưới tán lá rủ',
+      fact: 'Bắn tia nước chính xác 1–2 m để hạ côn trùng trên lá cây.',
+    },
+    wiki: {
+      weight: '~150–250 g', lifespan: '~5–8 năm',
+      diet: 'Côn trùng trên cạn, giun, tôm nhỏ',
+      status: 'LC', depthRange: '0–1 m',
+      records: 'Tự hiệu chỉnh được khúc xạ ánh sáng qua mặt nước — bài toán quang học mà cá phải giải mỗi lần bắn.',
+      body: 'Thân cá măng dẹt bên và cao, lưng gần như thẳng, đầu nhọn với mắt to đặt trước cho thị giác hai mắt. Miệng hếch lên với hàm dưới nhô ra tạo thành rãnh; ép lưỡi lên vòm miệng, nó phụt ra một tia nước có đầu nặng đủ sức hất con mồi rơi xuống. Bốn đến sáu vệt đen hình nêm trên lưng kéo dài lên tận vây lưng, phá vỡ đường viền thân khi nhìn từ trên xuống.',
+    },
+  },
+  mud_crab: {
+    id: 'mud_crab', name: 'Giant Mud Crab',
+    viet: 'Cua bùn', scientific: 'Scylla serrata',
+    length: 0.20, shape: 'crab',
+    colors: { body: 0x2f4436, fin: 0x4d6b4a, belly: 0xbfc7a8 },
+    homeBiome: 'mangrove', spawnBiomes: ['mangrove'],
+    depth: [-0.3, -6], schooling: false, speedFactor: 0.14, benthic: true,
+    info: {
+      habitat: 'Bùn triều và cửa sông rừng ngập mặn Ấn Độ Dương – Tây Thái Bình Dương',
+      fact: 'Càng đủ khỏe để cắn vỡ vỏ sò; một con cái mang tới một triệu trứng.',
+    },
+    wiki: {
+      weight: '2–3 kg', lifespan: '3–4 năm',
+      diet: 'Thân mềm, giáp xác, cá nhỏ, xác sinh vật',
+      status: 'LC', depthRange: '0–6 m',
+      records: 'Mai rộng tới 28 cm; chịu được độ mặn từ gần ngọt tới nước biển.',
+      body: 'Mai cua bùn nhẵn, hình bầu dục rộng với chín răng đều nhau mỗi bên phía trước, màu xanh lục sẫm tới gần đen với hoa văn đa giác trên chân và càng. Đôi chân sau dẹt thành mái chèo giúp nó bơi chứ không chỉ bò. Chúng đào hang trong bùn khi thủy triều rút và cực kỳ ăn thịt lẫn nhau — đó là lý do gần như luôn sống đơn độc.',
+    },
+  },
+  lemon_shark: {
+    id: 'lemon_shark', name: 'Lemon Shark',
+    viet: 'Cá mập chanh', scientific: 'Negaprion brevirostris',
+    length: 2.4, shape: 'shark',
+    colors: { body: 0xa9975c, band: 0xc4b47c, fin: 0x8e7e4c, belly: 0xeee7cf },
+    homeBiome: 'mangrove', spawnBiomes: ['mangrove', 'seagrass'],
+    depth: [-0.8, -90], schooling: true, schoolSize: [2, 5], speedFactor: 0.85,
+    info: {
+      habitat: 'Vườn ươm nước nông ven rừng ngập mặn; trưởng thành ra rạn san hô',
+      fact: 'Cá mập cái quay về đúng vùng nước nơi chính nó ra đời để sinh con.',
+    },
+    wiki: {
+      weight: '90–180 kg', lifespan: '25–30 năm',
+      diet: 'Cá, giáp xác, cá đuối',
+      status: 'VU', depthRange: '0–90 m',
+      records: 'Cá mập con gắn bó chặt với vùng ươm, có thể sống nhiều năm trong vài trăm mét vuông.',
+      body: 'Da vàng ô liu như quả chanh giúp cá mập chanh hòa lẫn vào nền cát và cỏ biển của vùng nước nông. Dấu hiệu nhận dạng chắc chắn nhất là hai vây lưng gần bằng nhau — hầu hết cá mập có vây lưng thứ hai nhỏ hơn hẳn. Mõm ngắn và bè. Chúng bơm nước qua miệng nên nằm yên dưới đáy được, và cá con sống thành nhóm gắn bó trong rễ đước để tránh kẻ săn mồi lớn hơn.',
+    },
+  },
+
+  // ================= SEAGRASS MEADOW =================
+  dugong: {
+    id: 'dugong', name: 'Dugong',
+    viet: 'Cá cúi', scientific: 'Dugong dugon',
+    length: 2.9, shape: 'dugong',
+    colors: { body: 0x8f8878, fin: 0x6f6959, belly: 0xc2bcab },
+    homeBiome: 'seagrass', spawnBiomes: ['seagrass'],
+    depth: [-1, -20], schooling: true, schoolSize: [2, 4], speedFactor: 0.55,
+    info: {
+      habitat: 'Thảm cỏ biển ven bờ ấm Ấn Độ Dương – Thái Bình Dương',
+      fact: 'Động vật có vú biển ăn chay duy nhất; để lại vệt cày trên thảm cỏ khi gặm.',
+    },
+    wiki: {
+      weight: '230–400 kg', lifespan: '50–70 năm',
+      diet: 'Cỏ biển (Halophila, Halodule) — hoàn toàn ăn chay',
+      status: 'VU', depthRange: '0–20 m',
+      records: 'Nhiều khả năng là nguồn gốc của truyền thuyết nàng tiên cá.',
+      body: 'Cá cúi có thân hình trụ chắc nịch, không có vây lưng và không có chi sau — chỉ còn đôi vây ngực hình mái chèo và một chiếc đuôi chẻ nằm ngang như cá heo, phân biệt nó với lợn biển đuôi tròn. Mõm to cụp xuống mang một đĩa gặm hình móng ngựa phủ lông cứng, dùng để nhổ cả gốc rễ cỏ biển. Con đực già mọc ngà. Chúng vỗ đuôi chậm rãi, đi khoảng 10 km/h.',
+    },
+  },
+  seahorse: {
+    id: 'seahorse', name: 'Spotted Seahorse',
+    viet: 'Cá ngựa vằn đốm', scientific: 'Hippocampus kuda',
+    length: 0.17, shape: 'seahorse',
+    colors: { body: 0xd8a83c, band: 0x6b4a18, fin: 0xefd68a, belly: 0xf2e2ad },
+    homeBiome: 'seagrass', spawnBiomes: ['seagrass', 'mangrove'],
+    depth: [-0.5, -20], schooling: false, speedFactor: 0.08, benthic: false,
+    info: {
+      habitat: 'Thảm cỏ biển, rong và cửa sông Ấn Độ Dương – Thái Bình Dương',
+      fact: 'Con đực mang thai — ấp trứng trong túi bụng và sinh ra khoảng 250 con.',
+    },
+    wiki: {
+      weight: '8–9 g', lifespan: '1–4 năm',
+      diet: 'Chân chèo, tôm nhỏ hút qua mõm ống',
+      status: 'VU', depthRange: '0–68 m (thường 0–8 m)',
+      records: 'Vây lưng rung khoảng 35 lần mỗi giây mà vẫn là một trong những loài cá bơi chậm nhất.',
+      body: 'Cá ngựa đứng thẳng, thân bọc các vòng xương thay cho vảy, không có vây bụng và không có vây đuôi. Đầu gập vuông góc với thân như đầu ngựa, mõm kéo dài thành ống để hút mồi. Đuôi cuộn được, dùng để bám vào lá cỏ biển và neo mình lại giữa dòng. Chúng đổi màu để ngụy trang và khi ve vãn, thường sống thành cặp chung thủy.',
+    },
+  },
+  sea_cucumber: {
+    id: 'sea_cucumber', name: 'Sandfish Sea Cucumber',
+    viet: 'Hải sâm cát', scientific: 'Holothuria scabra',
+    length: 0.30, shape: 'cucumber',
+    colors: { body: 0x4a423a, band: 0x2b2723, fin: 0x6b6055, belly: 0x9c917f },
+    homeBiome: 'seagrass', spawnBiomes: ['seagrass', 'coral_reef'],
+    depth: [-1, -20], schooling: false, speedFactor: 0.04, benthic: true,
+    info: {
+      habitat: 'Đáy cát bùn dưới thảm cỏ biển Ấn Độ Dương – Thái Bình Dương',
+      fact: 'Nuốt cát để lấy mùn hữu cơ, đảo trộn đáy biển như giun đất dưới nước.',
+    },
+    wiki: {
+      weight: '1–1,5 kg', lifespan: '~10 năm',
+      diet: 'Mùn hữu cơ và vi khuẩn trong trầm tích',
+      status: 'EN', depthRange: '0–20 m',
+      records: 'Khi bị đe dọa có thể phun ruột ra ngoài rồi mọc lại toàn bộ.',
+      body: 'Hải sâm cát có thân bầu dục, lưng cong và bụng dẹt tạo tiết diện nửa tròn, nằm áp sát nền. Miệng ở mặt dưới phía trước với khoảng 20 xúc tu ngắn dùng xúc cát vào. Mặt lưng nâu sẫm tới đen có vân xám ngang, mặt bụng nhạt hơn — ngụy trang hoàn hảo trên trầm tích. Ban ngày nó vùi một phần thân trong cát.',
+    },
+  },
+  bluespotted_ray: {
+    id: 'bluespotted_ray', name: 'Bluespotted Ribbontail Ray',
+    viet: 'Cá đuối đốm xanh', scientific: 'Taeniura lymma',
+    length: 0.35, shape: 'ray',
+    colors: { body: 0xb08a3e, fin: 0x8c6c2e, belly: 0xf0ead6 },
+    homeBiome: 'seagrass', spawnBiomes: ['seagrass', 'coral_reef'],
+    depth: [-0.5, -30], schooling: false, speedFactor: 0.55,
+    info: {
+      habitat: 'Bãi cát và cỏ biển quanh rạn san hô Ấn Độ Dương – Tây Thái Bình Dương',
+      fact: 'Các đốm xanh neon là tín hiệu cảnh báo hai gai độc trên đuôi.',
+    },
+    wiki: {
+      weight: '~5 kg', lifespan: '~15 năm',
+      diet: 'Động vật đáy không xương, cá nhỏ',
+      status: 'LC', depthRange: '0–30 m',
+      records: 'Ban ngày nấp dưới gờ san hô, đêm ra bãi cát kiếm ăn theo thủy triều.',
+      body: 'Đĩa thân hình bầu dục rộng tới 35 cm, dày hơn phần lớn cá đuối, mang những đốm xanh neon rực rỡ trên nền vàng nâu cùng hai sọc xanh chạy dọc chiếc đuôi mập. Mắt vàng lồi hẳn lên khỏi đĩa — khác với cá đuối ó có mắt chìm. Nó bơi bằng cách gợn sóng rìa đĩa và đào cát bằng luồng nước phun ra từ mang để moi mồi chôn bên dưới.',
+    },
+  },
+
+  // ================= BLUE HOLE =================
+  reef_shark: {
+    id: 'reef_shark', name: 'Caribbean Reef Shark',
+    viet: 'Cá mập rạn Caribe', scientific: 'Carcharhinus perezi',
+    length: 2.2, shape: 'shark',
+    colors: { body: 0x7d7f78, band: 0x94968d, fin: 0x63655f, belly: 0xeceee9 },
+    homeBiome: 'blue_hole', spawnBiomes: ['blue_hole', 'coral_reef'],
+    depth: [-1, -65], schooling: true, schoolSize: [2, 6], speedFactor: 0.95,
+    info: {
+      habitat: 'Gờ đá và vành hố xanh vùng Tây Đại Tây Dương',
+      fact: 'Nằm bất động dưới đáy được — hiếm thấy ở cá mập requiem.',
+    },
+    wiki: {
+      weight: '~70 kg', lifespan: '~14–20 năm',
+      diet: 'Cá rạn, cá đuối, mực',
+      status: 'EN', depthRange: '1–65 m (ngoài thềm tới 436 m)',
+      records: 'Loài cá mập thường gặp nhất trên rạn Caribe, tuần tra vành hố xanh nơi còn oxy.',
+      body: 'Cá mập rạn Caribe có thân hình thoi chắc, mõm ngắn tròn và một gờ nhỏ chạy giữa hai vây lưng — đặc điểm phân biệt với các loài requiem khác. Vây không có hoa văn, xám nâu trên lưng chuyển trắng dưới bụng khá dứt khoát. Chúng tuần tra lớp nước còn oxy phía trên của hố xanh; bên dưới tầng hydro sulfua thì không sinh vật nào sống được.',
+    },
+  },
+
   // ---- Small ambient life: populates reefs/kelp so the sea feels alive.
   reef_fry: {
     id: 'reef_fry',
@@ -436,10 +614,11 @@ export const SPECIES = {
 };
 
 // Species you can PLAY as (menu + journal). Small ambient life is excluded.
-export const SPECIES_ORDER = ['clownfish', 'sea_turtle', 'sea_snake', 'vaquita', 'bluefin_tuna', 'sunfish', 'great_white', 'dolphin', 'manta_ray', 'blue_whale', 'giant_squid', 'anglerfish'];
+export const SPECIES_ORDER = ['clownfish', 'seahorse', 'sea_turtle', 'sea_snake', 'archerfish', 'vaquita', 'bluespotted_ray', 'reef_shark', 'bluefin_tuna', 'lemon_shark', 'dugong', 'sunfish', 'great_white', 'dolphin', 'manta_ray', 'blue_whale', 'giant_squid', 'anglerfish'];
 
 // Everything that can spawn in the world, including ambient life.
-export const ALL_SPECIES = [...SPECIES_ORDER, 'reef_fry', 'starfish', 'crab'];
+export const ALL_SPECIES = [...SPECIES_ORDER, 'reef_fry', 'starfish', 'crab',
+  'mudskipper', 'mud_crab', 'sea_cucumber'];
 
 // IUCN Red List categories used in the encyclopedia.
 export const IUCN = {

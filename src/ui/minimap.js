@@ -11,6 +11,9 @@ const MAP_COLORS = {
   open_ocean: '#2e5f80',
   polar: '#a9c4d2',
   deep_sea: '#132433',
+  mangrove: '#5c4a2e',
+  blue_hole: '#1b57b8',
+  seagrass: '#6fa347',
 };
 
 export class Minimap {

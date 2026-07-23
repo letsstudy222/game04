@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
-import { floorHeightAt, biomeAt, BIOME_DEF } from './biomes.js';
+import { floorHeightAt, biomeAt, blueHoleAt, BIOME_DEF } from './biomes.js';
 import { SPECIES, speciesForBiome } from '../data/species.js';
 import { applyCaustics } from './waterShader.js';
 
@@ -269,6 +269,134 @@ function makeWreck() {
   return g;
 }
 
+
+// --- Mangrove: the prop-root tangle IS the habitat -------------------------
+// Rhizophora sends arching stilt roots down from the trunk, making a dense
+// three-dimensional cage that traps sediment and shelters juveniles. Avicennia
+// pushes pencil-like pneumatophores up out of the mud to breathe.
+function makeMangrove() {
+  const g = new THREE.Group();
+  const bark = new THREE.MeshStandardMaterial({ color: 0x4b3a28, roughness: 0.95 });
+  const rootM = new THREE.MeshStandardMaterial({ color: 0x5a4630, roughness: 0.95 });
+  const leaf = new THREE.MeshStandardMaterial({
+    color: 0x2f5a24, roughness: 0.85, side: THREE.DoubleSide });
+
+  const trunkH = 2.6 + Math.random() * 1.6;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, trunkH, 9), bark);
+  trunk.position.y = trunkH * 0.5;
+  g.add(trunk);
+
+  // arching stilt roots — the signature silhouette
+  const nRoots = 7 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < nRoots; i++) {
+    const a = (i / nRoots) * Math.PI * 2 + Math.random() * 0.4;
+    const reach = 0.7 + Math.random() * 0.9;
+    const top = trunkH * (0.30 + Math.random() * 0.35);
+    const segs = 5;
+    for (let k = 0; k < segs; k++) {
+      const t0 = k / segs, t1 = (k + 1) / segs;
+      const arc = (t) => new THREE.Vector3(
+        Math.cos(a) * reach * t,
+        top * (1 - t * t),                       // arches down and outward
+        Math.sin(a) * reach * t);
+      const p0 = arc(t0), p1 = arc(t1);
+      const d = p1.clone().sub(p0);
+      const seg = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.055 - k * 0.007, 0.065 - k * 0.007, d.length() * 1.1, 6), rootM);
+      seg.position.copy(p0).lerp(p1, 0.5);
+      seg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize());
+      g.add(seg);
+    }
+  }
+  // pneumatophores poking out of the mud around the base
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2, r = 0.5 + Math.random() * 1.6;
+    const h = 0.16 + Math.random() * 0.30;
+    const pn = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, h, 5), rootM);
+    pn.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r);
+    g.add(pn);
+  }
+  // a little canopy above the waterline
+  for (let i = 0; i < 5; i++) {
+    const cl = new THREE.Mesh(new THREE.SphereGeometry(0.55 + Math.random() * 0.35, 8, 6), leaf);
+    cl.scale.y = 0.55;
+    cl.position.set((Math.random() - 0.5) * 1.4, trunkH + 0.3 + Math.random() * 0.5,
+                    (Math.random() - 0.5) * 1.4);
+    g.add(cl);
+  }
+  g.userData.sway = false;
+  return g;
+}
+
+// --- Seagrass: dense blades that bend with the current --------------------
+// Blade lengths follow the real species: Thalassia ribbons 10-35 cm,
+// Syringodium cylinders 7-30 cm, temperate Zostera straps 40-100 cm.
+function makeSeagrass() {
+  const g = new THREE.Group();
+  const tone = Math.random();
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(0.26 + tone * 0.06, 0.45, 0.26 + tone * 0.10),
+    roughness: 0.9, side: THREE.DoubleSide });
+  const n = 26 + Math.floor(Math.random() * 22);
+  for (let i = 0; i < n; i++) {
+    const h = 0.22 + Math.random() * 0.75;
+    const geo = new THREE.PlaneGeometry(0.035 + Math.random() * 0.03, h, 1, 4);
+    geo.translate(0, h / 2, 0);
+    const blade = new THREE.Mesh(geo, mat);
+    blade.position.set((Math.random() - 0.5) * 2.6, 0, (Math.random() - 0.5) * 2.6);
+    blade.rotation.y = Math.random() * Math.PI;
+    blade.userData.swayPhase = Math.random() * Math.PI * 2;
+    blade.userData.swayAmp = 0.16 + Math.random() * 0.14;
+    g.add(blade);
+  }
+  g.userData.sway = true;                       // reuses the kelp sway pass
+  return g;
+}
+
+// --- Blue hole karst: limestone walls, stalactites, bacterial mat ---------
+function makeKarst() {
+  const g = new THREE.Group();
+  const rock = new THREE.MeshStandardMaterial({ color: 0x9c9078, roughness: 1 });
+  const pale = new THREE.MeshStandardMaterial({ color: 0xc4b89c, roughness: 0.95 });
+  const kind = Math.random();
+  if (kind < 0.45) {
+    // stalactite cluster, as hangs from the Great Blue Hole overhangs
+    for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
+      const h = 1.8 + Math.random() * 4.5;
+      const st = new THREE.Mesh(new THREE.ConeGeometry(0.25 + Math.random() * 0.3, h, 7), pale);
+      st.position.set((Math.random() - 0.5) * 1.8, -h / 2, (Math.random() - 0.5) * 1.8);
+      g.add(st);
+    }
+  } else if (kind < 0.8) {
+    // eroded limestone block with solution pockets
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1 + Math.random() * 0.9, 1), rock);
+    b.scale.set(1, 0.7 + Math.random() * 0.5, 1);
+    b.position.y = 0.5;
+    g.add(b);
+    for (let i = 0; i < 5; i++) {
+      const pit = new THREE.Mesh(new THREE.SphereGeometry(0.2 + Math.random() * 0.2, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0x6b6350, roughness: 1 }));
+      pit.position.set((Math.random() - 0.5) * 1.6, 0.5 + (Math.random() - 0.5) * 1.0,
+                       (Math.random() - 0.5) * 1.6);
+      g.add(pit);
+    }
+  } else {
+    // sulphur-oxidising bacterial mat draping the halocline
+    const mat2 = new THREE.MeshStandardMaterial({
+      color: 0xd9d2a8, roughness: 1, transparent: true, opacity: 0.72,
+      side: THREE.DoubleSide });
+    for (let i = 0; i < 4; i++) {
+      const w = 1.2 + Math.random() * 1.8;
+      const sheet = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.6, 3, 2), mat2);
+      sheet.rotation.set(Math.random() * 0.6 - 0.3, Math.random() * Math.PI, 0);
+      sheet.position.set((Math.random() - 0.5) * 2, 0.3 + Math.random() * 1.2,
+                         (Math.random() - 0.5) * 2);
+      g.add(sheet);
+    }
+  }
+  return g;
+}
+
 function decorFor(type, accent) {
   switch (type) {
     case 'coral': return makeCoral(accent);
@@ -276,6 +404,9 @@ function decorFor(type, accent) {
     case 'sparse_rock': return makeRock();
     case 'ice': return makeIce();
     case 'vent': return makeVent();
+    case 'mangrove': return makeMangrove();
+    case 'seagrass': return makeSeagrass();
+    case 'karst': return makeKarst();
     default: return makeRock();
   }
 }
@@ -321,6 +452,8 @@ export function buildChunk(noise, cx, cz) {
   decor.position.set(originX, 0, originZ);
   const centerBiome = biomeAt(noise, originX, originZ).biome;
   const def = BIOME_DEF[centerBiome];
+  // Mangrove roots and seagrass are the habitat itself, not scenery, so these
+  // biomes carry far more decoration than an open seabed does.
   const count = Math.round(10 * (def.decorDensity || 0.5));
   for (let i = 0; i < count; i++) {
     const rx = (seededRand(originX + i * 13.7, originZ) - 0.5) * size;
