@@ -14,6 +14,9 @@ import { Journal, ACHIEVEMENTS } from './core/journal.js';
 import { Toasts } from './ui/toast.js';
 import { renderJournal } from './ui/journalPanel.js';
 import { Minimap } from './ui/minimap.js';
+import { WorldMap } from './ui/worldmap.js';
+import { lonLatAt } from './world/earth.js';
+import { seaAt } from './world/seas.js';
 import { buildRig } from './core/lighting.js';
 import { RIG } from './core/lighting.js';
 import { renderEncyclopedia } from './ui/encyclopedia.js';
@@ -72,6 +75,7 @@ const minimap = new Minimap(
   document.getElementById('minimap-canvas'),
   (x, z) => chunks.getBiome(x, z)
 );
+const worldMap = new WorldMap(journal);
 
 // --- menu wiring (rebuilt on each visit so ✓ badges stay fresh) ---
 function rebuildMenu() {
@@ -204,8 +208,24 @@ function toggleJournal() {
   }
 }
 journalEl?.addEventListener('click', (e) => { if (e.target === journalEl) toggleJournal(); });
+minimapEl?.addEventListener('click', () => toggleWorldMap());
+
+// The chart needs the cursor, but swimming holds a pointer lock. Releasing it
+// on open and asking for it back on close is what makes the map clickable.
+function toggleWorldMap() {
+  if (!player || (state !== 'playing' && state !== 'photo')) return;
+  if (worldMap.open) {
+    worldMap.hide();
+    canvas.requestPointerLock?.();
+  } else {
+    document.exitPointerLock?.();
+    worldMap.show(player.position);
+  }
+}
 
 window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyN') { toggleWorldMap(); return; }
+  if (e.code === 'Escape' && worldMap.open) { toggleWorldMap(); return; }
   if (e.code === 'KeyM' && (state === 'playing' || state === 'photo')) returnToMenu();
   if (e.code === 'KeyB') toggleSound();
   if (e.code === 'KeyJ') toggleJournal();
@@ -303,7 +323,19 @@ function unlockAch(id) {
   }
 }
 
+let lastSea = null;
 function checkDiscoveries(dt, pos, biome) {
+  // Fill in the chart as you swim, and announce a sea the first time you enter
+  // it — on a real Earth "which water is this" is a more meaningful landmark
+  // than which habitat type happens to be underneath.
+  const { lon, lat } = lonLatAt(pos.x, pos.z);
+  journal.explore(lon, lat);
+  const sea = seaAt(lon, lat);
+  if (sea.vi !== lastSea) {
+    lastSea = sea.vi;
+    toasts.show(`🧭 <b>${sea.vi}</b>`, 3200);
+  }
+
   // biome first-visit
   if (biome !== lastBiome) {
     lastBiome = biome;

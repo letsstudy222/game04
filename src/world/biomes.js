@@ -4,6 +4,8 @@
 
 
 // Visual + terrain identity for each biome.
+import { earthFields, biomeWeightsAt, worldAt, WORLD_W } from './earth.js';
+
 export const BIOME_DEF = {
   coral_reef: {
     label: 'Rạn san hô',
@@ -98,65 +100,57 @@ export const BIOME_DEF = {
 // Determine biome from continuous fields. Returns { biome, blend } where blend
 // helps smooth terrain across borders.
 export function biomeAt(noise, x, z) {
-  const s = 0.0014; // region scale — smaller => cross biomes more often while swimming
-  const temp = noise.fbm2(x * s + 1000, z * s + 1000, { octaves: 3, gain: 0.55 });
-  const depthField = noise.fbm2(x * s - 2000, z * s - 2000, { octaves: 3, gain: 0.55 });
-  // A third field standing in for distance from land. Mangrove, seagrass and
-  // blue holes are all coastal features, so they need a shore axis; two fields
-  // could not separate them from the open-water biomes.
-  const shore = noise.fbm2(x * s + 5000, z * s - 5000, { octaves: 3, gain: 0.55 });
+  // Geography now decides this; see earth.js. Kept as a thin wrapper because
+  // chunk.js, chunkManager.js and the minimap all call it.
+  const { biome } = earthFields(noise, x, z);
+  return { biome };
+}
 
-  // Thresholds calibrated to the fbm distribution (mean 0, sd ~0.15). Depth
-  // carves basins first; open_ocean always sits between shallow reefs and the
-  // deep sea so the seafloor grades reef -> open -> deep instead of cliffing.
-  let biome;
-  if (depthField > 0.17) biome = 'deep_sea';
-  else if (depthField > 0.04) biome = 'open_ocean';
-  else if (shore < -0.20 && temp > -0.02) biome = 'mangrove';   // warmest, nearest land
-  else if (shore < -0.11 && temp > -0.04) biome = 'seagrass';   // shallow sand shelf
-  else if (shore > 0.20 && temp > 0.02) biome = 'blue_hole';    // karst platform
-  else if (temp > 0.06) biome = 'coral_reef';
-  else if (temp < -0.06) biome = 'polar';
-  else biome = 'kelp_forest';
-  return { biome, temp, depthField, shore };
+export function biomeWeights(noise, x, z) {
+  return biomeWeightsAt(noise, x, z);
+}
+
+
+// Seafloor height (y, negative) at world (x,z), blended so biomes connect smoothly.
+
+// Real blue holes, by name and position. These are drowned karst shafts and
+// they exist in specific places — Belize, the Bahamas, the Red Sea, the South
+// China Sea — not wherever a noise field happens to cross a threshold, which
+// is how they used to be scattered.
+export const BLUE_HOLES = [
+  { name: 'Great Blue Hole',   lon: -87.535, lat: 17.316, radius: 150, depth: 124 },
+  { name: "Dean's Blue Hole",  lon: -74.895, lat: 23.785, radius: 90,  depth: 202 },
+  { name: 'Dragon Hole',       lon: 111.767, lat: 16.528, radius: 110, depth: 300 },
+  { name: 'Blue Hole Dahab',   lon: 34.537,  lat: 28.572, radius: 70,  depth: 130 },
+  { name: 'Blue Hole Gozo',    lon: 14.190,  lat: 36.049, radius: 55,  depth: 60 },
+  { name: 'Blue Hole Guam',    lon: 144.650, lat: 13.235, radius: 60,  depth: 90 },
+];
+
+// Precomputed game-space centres, filled on first use.
+let _holes = null;
+function holeSites() {
+  if (_holes) return _holes;
+  _holes = BLUE_HOLES.map((h) => {
+    const { x, z } = worldAt(h.lon, h.lat);
+    return { ...h, x, z };
+  });
+  return _holes;
 }
 
 // Blue holes are a hole, not a hill: a near-vertical karst shaft sunk into an
-// otherwise shallow platform. It is carved as its own term so the shaft keeps
-// its steep walls no matter what the surrounding terrain noise does.
+// otherwise shallow platform. Carved as its own term so the shaft keeps its
+// steep walls no matter what the surrounding terrain noise does.
 export function blueHoleAt(noise, x, z) {
-  const s = 0.0014;
-  const shore = noise.fbm2(x * s + 5000, z * s - 5000, { octaves: 3, gain: 0.55 });
-  if (shore <= 0.20) return null;
-  // A blue hole is drowned karst: it only forms in a SHALLOW carbonate
-  // platform, never in a deep basin. But these conditions must FADE rather
-  // than switch, or the shaft is sliced off flat wherever a noise field
-  // crosses its threshold, leaving a vertical cliff mid-rim.
-  const depthField = noise.fbm2(x * s - 2000, z * s - 2000, { octaves: 3, gain: 0.55 });
-  const temp = noise.fbm2(x * s + 1000, z * s + 1000, { octaves: 3, gain: 0.55 });
-  const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const strength = sm(0.20, 0.30, shore)
-                 * (1 - sm(0.06, 0.22, depthField))
-                 * sm(0.00, 0.07, temp);
-  if (strength <= 0.001) return null;
-  // Hole centres sit on a coarse jittered lattice. The neighbouring cells must
-  // all be tested: checking only the nearest lattice point meant a position
-  // just across a cell boundary failed to see the hole it was actually inside,
-  // which tore a vertical cliff through the rim.
-  const cell = 900;
-  const bx = Math.round(x / cell);
-  const bz = Math.round(z / cell);
   let best = null;
-  for (let oz = -1; oz <= 1; oz++) {
-    for (let ox = -1; ox <= 1; ox++) {
-      const cx = (bx + ox) * cell;
-      const cz = (bz + oz) * cell;
-      const jx = cx + noise.perlin2(cx * 0.01, cz * 0.01) * 300;
-      const jz = cz + noise.perlin2(cx * 0.01 + 40, cz * 0.01 - 40) * 300;
-      const d = Math.hypot(x - jx, z - jz);
-      const radius = 120 + noise.perlin2(cx * 0.02, cz * 0.02) * 45;
-      if (d > radius * 1.25) continue;
-      if (!best || d < best.d) best = { d, radius, cx: jx, cz: jz, strength };
+  for (const h of holeSites()) {
+    // the world wraps east-west, so measure the shorter way round
+    let dx = x - h.x;
+    if (dx > WORLD_W / 2) dx -= WORLD_W;
+    if (dx < -WORLD_W / 2) dx += WORLD_W;
+    const d = Math.hypot(dx, z - h.z);
+    if (d > h.radius * 1.25) continue;
+    if (!best || d < best.d) {
+      best = { d, radius: h.radius, cx: h.x, cz: h.z, strength: 1, name: h.name };
     }
   }
   return best;
@@ -164,50 +158,6 @@ export function blueHoleAt(noise, x, z) {
 
 const _sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-/**
- * Soft membership of every biome at a point, from the same three noise fields
- * biomeAt uses — no extra sampling.
- *
- * This exists because the terrain used to take baseDepth from ONE hard-chosen
- * biome. A reef sits at -14 m and open ocean at -120 m, so every boundary
- * between them was a 100 m vertical cliff. Blending the parameters instead
- * makes the seabed grade between habitats the way a real shelf does.
- */
-export function biomeWeights(noise, x, z) {
-  const s = 0.0014;
-  const temp = noise.fbm2(x * s + 1000, z * s + 1000, { octaves: 3, gain: 0.55 });
-  const depthField = noise.fbm2(x * s - 2000, z * s - 2000, { octaves: 3, gain: 0.55 });
-  const shore = noise.fbm2(x * s + 5000, z * s - 5000, { octaves: 3, gain: 0.55 });
-
-  const w = {};
-  // Wide windows on purpose: the narrower they are, the shorter the physical
-  // distance the seabed has to climb between habitats, and a 0.08-wide window
-  // turned the shelf edge into a vertical wall.
-  const deep = _sm(0.04, 0.30, depthField);
-  const open = _sm(-0.08, 0.12, depthField) * (1 - deep);
-  w.deep_sea = deep;
-  w.open_ocean = open;
-
-  let rest = Math.max(0, 1 - deep - open);
-  // coastal features, ordered from nearest land outward
-  const warm = _sm(-0.06, 0.02, temp);
-  const mang = _sm(-0.16, -0.24, shore) * warm;
-  const sea = _sm(-0.07, -0.15, shore) * warm * (1 - mang);
-  const karst = _sm(0.16, 0.24, shore) * _sm(-0.02, 0.06, temp);
-  w.mangrove = rest * mang;
-  w.seagrass = rest * sea;
-  w.blue_hole = rest * karst * (1 - mang - sea);
-
-  const left = Math.max(0, rest - w.mangrove - w.seagrass - w.blue_hole);
-  const reef = _sm(0.02, 0.10, temp);
-  const polar = _sm(-0.02, -0.10, temp);
-  w.coral_reef = left * reef * (1 - polar);
-  w.polar = left * polar * (1 - reef);
-  w.kelp_forest = Math.max(0, left - w.coral_reef - w.polar);
-  return w;
-}
-
-// Seafloor height (y, negative) at world (x,z), blended so biomes connect smoothly.
 export function floorHeightAt(noise, x, z) {
   const { biome } = biomeAt(noise, x, z);
   const def = BIOME_DEF[biome];

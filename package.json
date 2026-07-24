@@ -5,9 +5,11 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "check": "python3 tools/check-imports.py && node tools/build-all.mjs && node tools/verify-sharks.mjs && node tools/verify-rays.mjs && node tools/verify-reef.mjs && node tools/verify-crabs.mjs",
+    "check": "python3 tools/check-imports.py && node tools/build-all.mjs && node tools/verify-sharks.mjs && node tools/verify-rays.mjs && node tools/verify-reef.mjs && node tools/verify-crabs.mjs && node tools/verify-globe.mjs && node tools/earth-report.mjs",
     "serve": "npx http-server -p 8000"
   },
-  "devDependencies": { "three": "0.160.0" },
+  "devDependencies": {
+    "three": "^0.160.0"
+  },
   "license": "MIT"
 }
