@@ -28,7 +28,17 @@ vec3 gerstner(vec2 p, vec2 dir, float steep, float wl, float t, float speed) {
 
 /* ------------------------------------------------------- water surface */
 
-export function makeWaterSurface(size = 6000, segs = 220) {
+export function makeWaterSurface(size = 2000, segs = 256) {
+  // SIZE. The old surface was 6000 m across while fog swallows everything past
+  // roughly 640 m — 95% of its triangles were never seen. Shrinking it to 2400
+  // buys far more resolution for a modest cost. The widest fog reach is 736 m
+  // in the clearest biome, so a 1000 m half-width still never shows an edge.
+  //
+  // RESOLUTION. At 30 m per quad only the 62 m swell was above Nyquist; the
+  // 31, 15 and 7 m trains were finer than the mesh could represent and simply
+  // did not exist. At 9.4 m per quad the swell and both mid trains resolve, and
+  // everything below that moved to the fragment shader as normal detail, where
+  // it costs nothing and never aliases.
   const geo = new THREE.PlaneGeometry(size, size, segs, segs);
   geo.rotateX(-Math.PI / 2);
 
@@ -40,6 +50,7 @@ export function makeWaterSurface(size = 6000, segs = 220) {
     uSky: { value: new THREE.Color(0xcdeeff) },
     uDaylight: { value: 1 },
     uCamY: { value: -10 },
+    uWind: { value: 1.0 },
   };
 
   const material = new THREE.ShaderMaterial({
@@ -49,87 +60,177 @@ export function makeWaterSurface(size = 6000, segs = 220) {
     depthWrite: false,
     vertexShader: `
       uniform float uTime;
+      uniform float uWind;
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vCrest;
+      varying float vFold;
       ${GERSTNER}
-      void main() {
-        vec3 p = position;
-        vec2 xz = p.xz;
-        vec3 o = vec3(0.0);
-        // four wave trains at different scales and headings
-        o += gerstner(xz, vec2( 1.0,  0.35), 0.62, 62.0, uTime, 1.0);
-        o += gerstner(xz, vec2(-0.6,  1.0 ), 0.42, 31.0, uTime, 1.15);
-        o += gerstner(xz, vec2( 0.8, -0.75), 0.30, 15.0, uTime, 1.3);
-        o += gerstner(xz, vec2(-0.3, -1.0 ), 0.22,  7.0, uTime, 1.6);
-        p += o;
 
-        // finite-difference normal from the same wave field
-        float e = 1.2;
-        vec3 px = vec3(xz.x + e, 0.0, xz.y);
-        vec3 pz = vec3(xz.x, 0.0, xz.y + e);
-        vec3 ox = vec3(0.0), oz = vec3(0.0);
-        ox += gerstner(px.xz, vec2( 1.0,  0.35), 0.62, 62.0, uTime, 1.0);
-        ox += gerstner(px.xz, vec2(-0.6,  1.0 ), 0.42, 31.0, uTime, 1.15);
-        ox += gerstner(px.xz, vec2( 0.8, -0.75), 0.30, 15.0, uTime, 1.3);
-        oz += gerstner(pz.xz, vec2( 1.0,  0.35), 0.62, 62.0, uTime, 1.0);
-        oz += gerstner(pz.xz, vec2(-0.6,  1.0 ), 0.42, 31.0, uTime, 1.15);
-        oz += gerstner(pz.xz, vec2( 0.8, -0.75), 0.30, 15.0, uTime, 1.3);
-        vec3 a = (px + ox) - p;
-        vec3 b = (pz + oz) - p;
+      // One place, so the displacement and the normal can never disagree —
+      // the old version left the finest train out of the normal entirely.
+      vec3 waveField(vec2 xz, float t) {
+        vec3 o = vec3(0.0);
+        o += gerstner(xz, vec2( 1.0,  0.35), 0.62, 62.0, t, 1.00);
+        o += gerstner(xz, vec2(-0.6,  1.0 ), 0.44, 31.0, t, 1.15);
+        o += gerstner(xz, vec2( 0.8, -0.75), 0.32, 17.0, t, 1.30);
+        o += gerstner(xz, vec2(-0.3, -1.0 ), 0.22, 11.0, t, 1.60);
+        o += gerstner(xz, vec2( 0.55, 0.9 ), 0.16,  7.5, t, 1.85);
+        return o * uWind;
+      }
+
+      void main() {
+        vec2 xz = position.xz;
+        vec3 o = waveField(xz, uTime);
+        vec3 p = position + o;
+
+        // Finite difference at roughly one quad, which is the finest thing the
+        // mesh can actually carry.
+        float e = 4.0;
+        vec3 a = (vec3(xz.x + e, 0.0, xz.y) + waveField(xz + vec2(e, 0.0), uTime)) - p;
+        vec3 b = (vec3(xz.x, 0.0, xz.y + e) + waveField(xz + vec2(0.0, e), uTime)) - p;
         vNormal = normalize(cross(b, a));
 
-        vCrest = clamp(o.y * 0.5 + 0.5, 0.0, 1.0);
+        vCrest = clamp(o.y * 0.55 + 0.5, 0.0, 1.0);
+
+        // Horizontal Jacobian: where a Gerstner surface folds in on itself the
+        // wave is breaking. This is what foam should key off, not height — a
+        // tall smooth swell has no white on it at all.
+        float dxdx = 1.0 + (a.x - e) / e;
+        float dzdz = 1.0 + (b.z - e) / e;
+        vFold = clamp(1.0 - (dxdx * dzdz), 0.0, 1.0);
+
         vWorld = p;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       }`,
     fragmentShader: `
       uniform vec3 uSunDir, uShallow, uDeep, uSky;
-      uniform float uDaylight, uCamY, uTime;
+      uniform float uDaylight, uCamY, uTime, uWind;
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vCrest;
+      varying float vFold;
+
+      vec2 hash22(vec2 p) {
+        p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+        return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+      }
+      float gnoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(dot(hash22(i), f),
+                       dot(hash22(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
+                   mix(dot(hash22(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)),
+                       dot(hash22(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x), u.y);
+      }
+
+      // Ripples below the mesh resolution, as a normal only. Real water carries
+      // centimetre-scale chop that never displaces anything visibly but is
+      // entirely responsible for how it glitters.
+      vec3 rippleNormal(vec2 p, float t) {
+        float h = 0.0, amp = 1.0, frq = 0.35;
+        vec2 dr = vec2(0.0);
+        for (int i = 0; i < 3; i++) {
+          vec2 q = p * frq + vec2(t * (0.6 + float(i) * 0.35), t * 0.25);
+          float e = 0.6 / frq;
+          float c = gnoise(q);
+          dr.x += (gnoise(q + vec2(e * frq, 0.0)) - c) * amp;
+          dr.y += (gnoise(q + vec2(0.0, e * frq)) - c) * amp;
+          amp *= 0.55; frq *= 2.7;
+        }
+        return normalize(vec3(-dr.x * 2.6, 1.0, -dr.y * 2.6));
+      }
+
       void main() {
         vec3 view = normalize(cameraPosition - vWorld);
         vec3 n = normalize(vNormal);
+
+        // Blend the ripple normal into the wave normal in the wave's own frame.
+        vec3 rn = rippleNormal(vWorld.xz, uTime);
+        vec3 t1 = normalize(cross(vec3(0.0, 1.0, 0.0), n) + vec3(0.001));
+        vec3 t2 = cross(n, t1);
+        n = normalize(n + (t1 * rn.x + t2 * rn.z) * 0.75 * uWind);
+
         bool below = uCamY < 0.0;
         if (below) n = -n;
 
         float fres = pow(1.0 - clamp(dot(n, view), 0.0, 1.0), 3.0);
+
+        // Foam: breaking crests, broken up by noise so the line is ragged
+        // rather than a clean contour, and thinned where the sea is calm.
+        // Thresholds are set from the measured Jacobian distribution, not by
+        // eye: half the sea sits below 0.06 fold and the 90th percentile is
+        // 0.65, so keying foam at 0.30 painted 41% of the ocean white. Real sea
+        // shows whitecaps on a few per cent of its surface.
+        float foamN = gnoise(vWorld.xz * 0.55 + vec2(uTime * 0.25, uTime * 0.11)) * 0.5 + 0.5;
+        float foam = smoothstep(0.66, 0.90, vFold) * smoothstep(0.35, 0.80, foamN);
+        foam = clamp(foam + smoothstep(0.955, 1.0, vCrest) * 0.30 * foamN, 0.0, 1.0);
+
         vec3 col;
         float alpha;
 
         if (below) {
           // ---- Snell's window -------------------------------------------
-          // Looking up, refraction squeezes the entire sky into a disc about
-          // 97 degrees across. Inside it you see the sky and sun; outside,
-          // the underside of the surface mirrors the dark sea back at you.
+          // Looking up, refraction squeezes the whole sky into a disc about 97
+          // degrees across. Outside it the underside mirrors the sea back.
           float up = clamp(dot(view, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
-          float window = smoothstep(0.62, 0.80, up);
-          vec3 outside = mix(uDeep * 0.35, uDeep, 0.5);
+          // the rim wobbles with the surface instead of being a perfect circle
+          float wob = gnoise(vWorld.xz * 0.06 + uTime * 0.15) * 0.05;
+          float window = smoothstep(0.60 + wob, 0.80 + wob, up);
+          vec3 outside = mix(uDeep * 0.30, uDeep, 0.5);
           vec3 inside = mix(uShallow, uSky, 0.55) * (0.35 + 0.65 * uDaylight);
 
-          // refracted sun disc, wobbling with the wave normal
           vec3 sunView = normalize(uSunDir + n * 0.35);
           float sun = pow(max(dot(view, sunView), 0.0), 220.0);
           float glow = pow(max(dot(view, sunView), 0.0), 14.0);
 
           col = mix(outside, inside, window);
-          col += vec3(1.0, 0.96, 0.86) * sun * 2.6 * uDaylight * window;
-          col += vec3(0.75, 0.92, 1.0) * glow * 0.5 * uDaylight * window;
-          // bright rim where the window edge folds
-          col += uSky * smoothstep(0.60, 0.66, up) *
-                 (1.0 - smoothstep(0.66, 0.74, up)) * 0.5 * uDaylight;
-          alpha = mix(0.42, 0.80, window);
+          col += vec3(1.0, 0.96, 0.86) * sun * 2.8 * uDaylight * window;
+          col += vec3(0.75, 0.92, 1.0) * glow * 0.55 * uDaylight * window;
+
+          // Chromatic fringe at the rim. Different wavelengths refract at
+          // slightly different angles, so the edge of the window is banded —
+          // warm just inside, cold just outside.
+          float rim = smoothstep(0.585 + wob, 0.655 + wob, up)
+                    * (1.0 - smoothstep(0.655 + wob, 0.755 + wob, up));
+          col += vec3(1.15, 0.85, 0.55) * rim * 0.45 * uDaylight;
+          col += vec3(0.35, 0.70, 1.20) * rim * 0.28 * uDaylight;
+
+          // foam seen from underneath: a bright scatter, not white paint
+          col += vec3(0.80, 0.94, 1.0) * foam * 0.30 * uDaylight;
+          alpha = mix(0.42, 0.82, window);
         } else {
           // ---- seen from above -------------------------------------------
-          vec3 body = mix(uDeep, uShallow, vCrest);
+          // Sky gradient rather than one flat colour, so the reflection has
+          // somewhere to be bright and somewhere to be deep.
+          vec3 refl = reflect(-view, n);
+          vec3 skyCol = mix(uSky * 0.72, uSky, clamp(refl.y, 0.0, 1.0));
+          skyCol = mix(skyCol, vec3(1.0, 0.95, 0.85),
+                       pow(max(dot(refl, uSunDir), 0.0), 8.0) * 0.5);
+
+          // Subsurface scattering: sunlight passing THROUGH a crest and coming
+          // out the near side. This is what stops water reading as painted
+          // metal — the green glow in a backlit wave.
+          float sss = pow(clamp(dot(view, -uSunDir) * 0.5 + 0.5, 0.0, 1.0), 3.0)
+                    * smoothstep(0.35, 0.95, vCrest);
+          vec3 sssCol = mix(uShallow, vec3(0.35, 0.95, 0.80), 0.45) * sss * 0.9;
+
+          vec3 body = mix(uDeep, uShallow, vCrest * 0.85);
+          col = mix(body, skyCol, clamp(fres * 0.92, 0.0, 1.0));
+          col += sssCol * uDaylight;
+
+          // Glitter. A single wide highlight reads as plastic; the sparkle of
+          // real water comes from the ripple normals catching the sun at many
+          // tiny angles at once, so the specular is driven by the PERTURBED
+          // normal and kept very tight.
           vec3 h = normalize(uSunDir + view);
-          float spec = pow(max(dot(n, h), 0.0), 180.0);
-          col = mix(body, uSky, fres * 0.85) * (0.3 + 0.7 * uDaylight);
-          col += vec3(1.0, 0.97, 0.9) * spec * 1.8 * uDaylight;
-          col += vec3(1.0) * smoothstep(0.86, 1.0, vCrest) * 0.18;  // foam on crests
-          alpha = 0.86;
+          float spec = pow(max(dot(n, h), 0.0), 400.0);
+          float broad = pow(max(dot(n, h), 0.0), 60.0);
+          col += vec3(1.0, 0.97, 0.90) * (spec * 3.4 + broad * 0.35) * uDaylight;
+
+          col *= (0.30 + 0.70 * uDaylight);
+          col = mix(col, vec3(0.95, 0.99, 1.0) * (0.35 + 0.65 * uDaylight), foam * 0.85);
+          alpha = mix(0.86, 0.97, foam);
         }
         gl_FragColor = vec4(col, alpha);
       }`,

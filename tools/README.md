@@ -118,3 +118,29 @@ chỉ để chuyển một con số. Một nơi ghi, nhiều nơi đọc.
 3. **Đàn cá dọn vệ sinh phải còn động.** `chunkManager` tìm trang trí động bằng
    `decor.children` — **chỉ một tầng**. Ban đầu tôi lồng đàn cá bên trong nhóm trạm,
    nên chúng bị gộp thành đá cứng. Giờ trả về riêng và gắn thẳng vào `decor`.
+
+## Hai bộ kiểm sinh ra từ một lỗi làm chết game
+
+Một lần sửa thêm `currentAt(...)` vào `player.js` nhưng **dòng import đi kèm không
+bao giờ vào file** — lệnh thay thế nhắm sai thứ tự tên trong `import { ... }` và
+âm thầm không làm gì. Hậu quả: mỗi khung ném `currentAt is not defined`, vòng lặp
+render chết ngay tick đầu. Chọn loài xong là đứng hình, bấm phím không phản ứng.
+
+**Không công cụ nào lúc đó bắt được:**
+
+| | vì sao trượt |
+|---|---|
+| `node --check` | cú pháp hợp lệ hoàn toàn |
+| `check-imports.py` | chỉ xác minh import *đã có* thì phân giải được — không có import thì không có gì để kiểm |
+| `build-all.mjs` | chỉ dựng mesh, không chạy `Player.update` |
+
+**`check-undefined.py`** quét tên được gọi mà không có nguồn (không import, không
+khai báo, không phải builtin). Chạy thử: xoá dòng import ra là nó chỉ thẳng vào
+`currentAt` và `currentFactorAtDepth`.
+
+**`verify-gameloop.mjs`** chạy đúng chuỗi cập nhật của `main.js` — `player.update`,
+`chunks.update`, `schools.update`, `frenzy.update`, `scattering.update` — 180 khung
+cho **cả 18 loài chơi được**, không cần trình duyệt. Lỗi trên bị bắt ở khung đầu tiên
+của loài đầu tiên.
+
+Cả hai chạy **đầu tiên** trong `npm run check`, trước mọi kiểm tra hình học.

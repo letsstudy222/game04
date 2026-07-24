@@ -7,6 +7,7 @@
 
 import { CONFIG, cruiseFor } from '../config.js';
 import { buildCreature, animateCreature } from './fishMesh.js';
+import { currentAt, currentFactorAtDepth } from '../world/currents.js';
 import * as THREE from 'three';
 
 const MAX_PITCH = Math.PI / 3;          // 60°

@@ -29,7 +29,7 @@ export class Ocean {
   _buildSurface() {
     // Gerstner-wave surface with a refracted sun (Snell's window) when seen
     // from below. See world/waterShader.js.
-    const { mesh, uniforms } = makeWaterSurface(6000, 200);
+    const { mesh, uniforms } = makeWaterSurface(2000, 256);
     this.surface = mesh;
     this.surfaceUniforms = uniforms;
     this.surface.position.y = CONFIG.world.surfaceY;
