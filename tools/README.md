@@ -68,3 +68,53 @@ sẽ vào texture **tối hơn nhiều** so với lúc nhìn bảng màu:
 Màu càng tối càng bị nén mạnh. Khi thêm màu mới vào `species.js`, hãy chọn theo **kết quả
 render ra**, đừng chọn theo bảng màu. Sửa tận gốc (đánh dấu DataTexture là sRGB) sẽ đổi diện
 mạo của cả 24 loài cùng lúc, nên chưa làm.
+
+## Đo hiệu năng
+
+`tools/scene-cost.mjs` dựng một vùng 5×5 chunk tại vài toạ độ thật rồi đếm draw
+call và tam giác. Đây là con số quyết định FPS, không phải polycount — bản đồ
+Trái Đất đưa rừng ngập mặn ra viền mọi bờ nhiệt đới, và một chunk ngập mặn từng
+sinh 719 mesh riêng lẻ.
+
+| Vùng | Trước `mergeStatic` | Sau |
+|---|---|---|
+| Ven bờ (Biển Đỏ) | 12.267 | **738** |
+| Rạn san hô | 2.427 | **302** |
+| Biển khơi | 754 | 618 |
+
+## Sự kiện thế giới sống
+
+| Bộ kiểm | Bắt lỗi gì |
+|---|---|
+| `verify-schools.mjs` | Một đàn phải là **đúng 1 lệnh vẽ** và dưới 1.200 tris/con; mọi điểm tuyến di cư phải nằm trên nước; đàn phải được thu dọn khi người chơi đi xa. Đã bắt được 2 tuyến có điểm rơi vào đất liền. |
+| `verify-currents.mjs` | Dòng chảy phải nằm đúng vị trí thật (Gulf Stream ngoài khơi Florida, Kuroshio ngoài khơi Nhật), phủ 20–45% mặt biển, và suy giảm theo độ sâu. Đã bắt được điểm cuối Gulf Stream rơi vào Scotland. |
+
+**Vì sao đàn cá chỉ tốn 1 lệnh vẽ:** mỗi loài được "nướng" xuống một geometry duy nhất
+(màu texture da đọc vào vertex color), rồi vẽ bằng `InstancedMesh`. Sóng bơi chạy trên
+vertex shader với pha riêng từng cá thể. Chi tiết nhỏ hơn 6% chiều dài thân bị loại — hai
+con mắt tốn ~1.700 tris, nhiều hơn cả thân, mà ở khoảng cách nhìn thấy đàn thì chỉ là một
+điểm. Nhờ vậy 3.080 → 312 tris/con.
+
+## Di cư thẳng đứng
+
+`verify-dvm.mjs` mô phỏng thật: thả một con cá ngừ ở −400 m, chạy 4 phút game ở
+pha đêm rồi 4 phút ở pha ngày, và **đòi con vật phải thực sự di chuyển**. Không
+đủ nếu dữ liệu `dvm` có mặt mà hành vi không xảy ra.
+
+Kết quả: cá ngừ −400 m → **−100 m qua đêm** → **−429 m ban ngày**.
+
+`Creature.daylight` là biến tĩnh dùng chung, cố ý: nếu truyền `daylight` qua tham
+số thì phải sửa chữ ký của `ChunkManager.update`, `Flock.update` và `Creature.update`
+chỉ để chuyển một con số. Một nơi ghi, nhiều nơi đọc.
+
+## Địa danh hiếm
+
+`verify-landmarks.mjs` kiểm ba thứ, và cả ba đều từng hỏng:
+
+1. **Tỉ lệ xuất hiện** — xác cá voi 4% chunk biển sâu, trạm vệ sinh 14% chunk rạn.
+2. **Vị trí phải báo được ra ngoài.** `mergeStatic` gộp trang trí thành một mesh mỗi
+   vật liệu và **xoá sạch `userData`**, nên không thể tìm lại địa danh bằng cách duyệt
+   mesh. `buildChunk` trả về mảng `landmarks` riêng.
+3. **Đàn cá dọn vệ sinh phải còn động.** `chunkManager` tìm trang trí động bằng
+   `decor.children` — **chỉ một tầng**. Ban đầu tôi lồng đàn cá bên trong nhóm trạm,
+   nên chúng bị gộp thành đá cứng. Giờ trả về riêng và gắn thẳng vào `decor`.

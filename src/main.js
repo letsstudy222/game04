@@ -15,7 +15,11 @@ import { Toasts } from './ui/toast.js';
 import { renderJournal } from './ui/journalPanel.js';
 import { Minimap } from './ui/minimap.js';
 import { WorldMap } from './ui/worldmap.js';
-import { lonLatAt } from './world/earth.js';
+import { SchoolManager } from './entities/school.js';
+import { FrenzyManager } from './entities/baitball.js';
+import { ScatteringLayer } from './world/dsl.js';
+import { Creature } from './entities/creature.js';
+import { lonLatAt, worldAt } from './world/earth.js';
 import { seaAt } from './world/seas.js';
 import { buildRig } from './core/lighting.js';
 import { RIG } from './core/lighting.js';
@@ -76,6 +80,22 @@ const minimap = new Minimap(
   (x, z) => chunks.getBiome(x, z)
 );
 const worldMap = new WorldMap(journal);
+
+// Migrating shoals. The world is geographically honest, so about half of any
+// swim is open water — measured at two and a half minutes of nothing between
+// anything worth seeing. These are what goes in that gap.
+const schools = new SchoolManager(scene, worldAt, (name, count) => {
+  toasts.show(`\u{1F41F} <b>${name}</b> — khoảng ${count} con đang đi ngang`, 5000);
+});
+
+// Feeding frenzies. Nothing here can touch you — you watch.
+// The deep scattering layer: a band of motes that climbs at dusk and sinks at
+// dawn, with the animals that eat it following.
+const scattering = new ScatteringLayer(scene);
+
+const frenzy = new FrenzyManager(scene, () => {
+  toasts.show('\u{1F30A} <b>Tiệc săn mồi</b> — quả cầu cá mồi đang bị xé, nhìn quanh xem', 5200);
+});
 
 // --- menu wiring (rebuilt on each visit so ✓ badges stay fresh) ---
 function rebuildMenu() {
@@ -146,6 +166,8 @@ function returnToMenu() {
   state = 'menu';
   if (player) { scene.remove(player.mesh); player = null; }
   chunks.clearAll();
+  schools.clear();
+  frenzy.clear();
   hudEl.classList.add('hidden');
   minimapEl.classList.add('hidden');
   hintEl.classList.add('hidden');
@@ -231,6 +253,11 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyJ') toggleJournal();
   if (e.code === 'KeyE') toggleEncyc();
   if (e.code === 'KeyG') statsEl.classList.toggle('hidden');
+  if (e.code === 'KeyR' && player && (state === 'playing' || state === 'photo')) {
+    const on = player.toggleCamLock();
+    toasts.show(on ? '🔒 Khoá góc camera — nhấn <b>R</b> để thả'
+                   : '🔓 Camera bám theo trở lại', 2600);
+  }
   if (e.code === 'KeyF' && player && (state === 'playing' || state === 'photo')) {
     const on = player.toggleFirstPerson();
     toasts.show(on ? '👁 Góc nhìn thứ nhất — nhấn <b>F</b> để quay lại'
@@ -324,7 +351,16 @@ function unlockAch(id) {
 }
 
 let lastSea = null;
+let lastCurrent = null;
 function checkDiscoveries(dt, pos, biome) {
+  // Entering a current is the most useful thing that can happen in open water,
+  // so it gets announced the way a new sea does.
+  const cur = player?.current || null;
+  if (cur !== lastCurrent) {
+    lastCurrent = cur;
+    if (cur) toasts.show(`\u{1F30A} Bạn vào <b>${cur}</b> — thả người trôi theo`, 4200);
+  }
+
   // Fill in the chart as you swim, and announce a sea the first time you enter
   // it — on a real Earth "which water is this" is a more meaningful landmark
   // than which habitat type happens to be underneath.
@@ -334,6 +370,18 @@ function checkDiscoveries(dt, pos, biome) {
   if (sea.vi !== lastSea) {
     lastSea = sea.vi;
     toasts.show(`🧭 <b>${sea.vi}</b>`, 3200);
+  }
+
+  // Landmarks: rare, fixed places worth swimming to. Reported out of buildChunk
+  // rather than read off the meshes, because merging strips their userData.
+  for (const L of chunks.landmarks) {
+    const d = Math.hypot(pos.x - L.x, pos.y - L.y, pos.z - L.z);
+    if (d > 55) continue;
+    if (L.kind === 'whale_fall' && journal.unlock('whale_fall')) {
+      toasts.show('\u{1F40B} <b>Xác cá voi</b> — một thân xác nuôi cả quần xã dưới đáy hàng chục năm', 6000);
+    } else if (L.kind === 'cleaning' && journal.unlock('cleaning')) {
+      toasts.show('\u{1F41F} <b>Trạm vệ sinh</b> — nơi duy nhất kẻ săn mồi đứng yên cạnh con mồi', 6000);
+    }
   }
 
   // biome first-visit
@@ -375,6 +423,7 @@ function animate() {
   if (dt > 0) adaptQuality(dt);
 
   const daylight = daylightAt(time);
+  Creature.daylight = daylight;
   rig.setDaylight(daylight);
 
   if (state === 'playing' && player) {
@@ -383,8 +432,11 @@ function animate() {
     const biome = chunks.getBiome(pos.x, pos.z);
     const playerInfo = { pos, length: player.species.length, id: player.species.id };
     chunks.update(dt, time, pos, playerInfo);
-    ocean.update(dt, time, pos, biome, daylight);
-    hud.update(pos, biome, player.yaw, player.pitch);
+    schools.update(dt, time, pos);
+    frenzy.update(dt, time, pos, biome);
+    scattering.update(dt, time, pos, daylight);
+    ocean.update(dt, time, pos, biome, daylight, player?.currentVec || null);
+    hud.update(pos, biome, player.yaw, player.pitch, player?.current || null, player?.currentStrength || 0);
     minimap.update(pos, player.yaw);
     checkDiscoveries(dt, pos, biome);
     drawStats(dt, pos);
@@ -402,7 +454,7 @@ function animate() {
     player.idleAnimate(dt);
     const biome = chunks.getBiome(pos.x, pos.z);
     chunks.update(dt, time, pos);
-    ocean.update(dt, time, pos, biome, daylight);
+    ocean.update(dt, time, pos, biome, daylight, player?.currentVec || null);
   } else {
     // gentle idle camera drift on the menu
     ocean.update(dt, time, new THREE.Vector3(0, -8, 0), 'coral_reef', daylight);

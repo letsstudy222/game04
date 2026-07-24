@@ -435,3 +435,7 @@ body {
   #wm-canvas { width: min(78vw, 62vh); height: min(78vw, 62vh); }
   .wm-legend { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* dòng chảy trên HUD — chỉ hiện khi đang ở trong một hải lưu */
+.hud-flow .hud-v { color: #7fd8ff; }
+.hud-flow.hidden { display: none; }

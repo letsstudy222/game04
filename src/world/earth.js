@@ -20,7 +20,13 @@
 
 import { EARTH_LAND_RLE, EARTH_RES, EARTH_W, EARTH_H } from './earthData.js';
 
-export const WORLD_SCALE = 400;                  // 1 game metre = 400 real metres
+// 1 game metre = WORLD_SCALE real metres. Measured against actual swim paths:
+// at 1:400 a player crossed 6.6 minutes of empty water between anything worth
+// looking at, and one stretch in ten ran past sixteen minutes. At 1:1200 that
+// median falls to 2.2 minutes and an interesting region still lasts 2.0, which
+// is a change of scene roughly every couple of minutes. Geography is untouched
+// — only how much game world a degree of longitude buys.
+export const WORLD_SCALE = 1200;
 const EARTH_CIRCUM = 40075000;                   // metres at the equator
 export const WORLD_W = EARTH_CIRCUM / WORLD_SCALE;        // ~100 km east-west
 // Lambert cylindrical EQUAL-AREA, not the usual equirectangular. Equirectangular
@@ -150,7 +156,15 @@ const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
  * the two can never disagree — they used to be separate implementations of the
  * same thresholds, which is a drift waiting to happen.
  */
+// floorHeightAt asks for the winning biome AND the full weight set at the same
+// point, and chunk building does that for every terrain vertex. Without this
+// the work is done twice, plus a third time inside earthFields — which cost
+// 68% on terrain generation and showed up as a frame-rate drop while chunks
+// stream in.
+let _mx = NaN, _mz = NaN, _mw = null, _mb = null, _mll = null;
+
 export function biomeWeightsAt(noise, x, z) {
+  if (x === _mx && z === _mz && _mw) return _mw;
   decode();
   const { lon, lat } = lonLatAt(x, z);
   const j = noise ? noise.fbm2(x * 0.0009 + 31, z * 0.0009 - 17, { octaves: 3, gain: 0.5 }) : 0;
@@ -167,7 +181,7 @@ export function biomeWeightsAt(noise, x, z) {
   const polar = sm(POLAR_EDGE - 6, POLAR_EDGE + 4, absLat);
   w.polar = polar;
   const rest = 1 - polar;
-  if (rest <= 0.001) return w;
+  if (rest <= 0.001) { _mx = x; _mz = z; _mw = w; _mb = null; _mll = { lon, lat }; return w; }
 
   // How far out from land, and how warm.
   const coastal = 1 - sm(COAST_BAND * 0.55, COAST_BAND, d);
@@ -194,7 +208,19 @@ export function biomeWeightsAt(noise, x, z) {
     w.coral_reef = left * warm;
     w.kelp_forest = left * (1 - warm);
   }
+  _mx = x; _mz = z; _mw = w; _mb = null; _mll = { lon, lat };
   return w;
+}
+
+/** Winning biome only — the hot path, called for every terrain vertex. */
+export function biomeIdAt(noise, x, z) {
+  const cached = (x === _mx && z === _mz && _mb);
+  if (cached) return _mb;
+  const w = biomeWeightsAt(noise, x, z);
+  let biome = 'open_ocean', best = -1;
+  for (const k in w) if (w[k] > best) { best = w[k]; biome = k; }
+  _mb = biome;
+  return biome;
 }
 
 /* -------------------------------------------------------------- public API */
@@ -202,8 +228,7 @@ export function biomeWeightsAt(noise, x, z) {
 /** Winning biome plus the raw geography, for HUD and map use. */
 export function earthFields(noise, x, z) {
   const w = biomeWeightsAt(noise, x, z);
-  let biome = 'open_ocean', best = -1;
-  for (const k in w) if (w[k] > best) { best = w[k]; biome = k; }
-  const { lon, lat } = lonLatAt(x, z);
+  const biome = biomeIdAt(noise, x, z);
+  const { lon, lat } = _mll;                 // already resolved by the call above
   return { lon, lat, biome, weights: w, land: isLand(lon, lat), coastDeg: coastDistance(lon, lat) };
 }

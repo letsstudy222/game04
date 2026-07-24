@@ -34,6 +34,12 @@ export class Player {
     // smoothed look input — removes mouse jitter, the #1 nausea source
     this._yawVel = 0;
     this._pitchVel = 0;
+    // Camera orbit lock: the camera stops chasing the body and holds the angle
+    // it was at, so you can watch your animal swim past instead of staring at
+    // the back of its head. Movement is unaffected.
+    this.camLock = false;
+    this.camLockYaw = 0;
+    this.camLockPitch = 0;
 
     // camera state (lags the body)
     this.camYaw = 0;
@@ -139,6 +145,22 @@ export class Player {
 
     this.mesh.position.addScaledVector(this.vel, dt);
 
+    // Carried by the ocean. This is applied to POSITION rather than folded into
+    // velocity on purpose: the current should move you without changing which
+    // way you are pointing or how fast you appear to be swimming, so drifting
+    // in one stays a passive, weightless thing rather than a speed boost.
+    const cur = currentAt(this.mesh.position.x, this.mesh.position.z);
+    this.current = cur.strength > 0.02 ? cur.name : null;
+    this.currentStrength = cur.strength;
+    if (cur.strength > 0.001) {
+      const f = currentFactorAtDepth(this.mesh.position.y);
+      this.mesh.position.x += cur.vx * f * dt;
+      this.mesh.position.z += cur.vz * f * dt;
+      this.currentVec = { x: cur.vx * f, z: cur.vz * f };
+    } else {
+      this.currentVec = null;
+    }
+
     // ---- water column limits (soft, no hard stop) ----
     const floor = getFloorY(this.mesh.position.x, this.mesh.position.z);
     const minY = floor + this.species.length * 0.7;
@@ -205,13 +227,19 @@ export class Player {
     }
 
     // Camera angles chase the body with a lag -> stable horizon, no whip.
+    // When locked they stop chasing and stay where they were.
     const chase = instant ? 1 : 1 - Math.exp(-5 * dt);
-    let dYaw = this.yaw - this.camYaw;
-    while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-    while (dYaw < -Math.PI) dYaw += Math.PI * 2;
-    this.camYaw += dYaw * chase;
-    // only 60% of body pitch -> horizon stays much steadier
-    this.camPitch += (this.pitch * 0.6 - this.camPitch) * chase;
+    if (this.camLock) {
+      this.camYaw = this.camLockYaw;
+      this.camPitch = this.camLockPitch;
+    } else {
+      let dYaw = this.yaw - this.camYaw;
+      while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+      while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+      this.camYaw += dYaw * chase;
+      // only 60% of body pitch -> horizon stays much steadier
+      this.camPitch += (this.pitch * 0.6 - this.camPitch) * chase;
+    }
 
     const back = new THREE.Vector3(
       -Math.sin(this.camYaw) * Math.cos(this.camPitch),
@@ -226,13 +254,28 @@ export class Player {
     if (instant) this.camera.position.copy(_desiredCamPos);
     else this.camera.position.lerp(_desiredCamPos, 1 - Math.exp(-7 * dt));
 
-    // look slightly ahead of the fish
-    _camTarget.copy(this.mesh.position).addScaledVector(
-      _dir.set(Math.sin(this.yaw), Math.sin(this.pitch) * 0.5, Math.cos(this.yaw)),
-      this.species.length * 1.6 + 2.5
-    );
+    // Normally the camera leads the fish so you can see where you are going.
+    // Locked, it looks straight at the animal — that is the whole point.
+    if (this.camLock) {
+      _camTarget.copy(this.mesh.position);
+    } else {
+      _camTarget.copy(this.mesh.position).addScaledVector(
+        _dir.set(Math.sin(this.yaw), Math.sin(this.pitch) * 0.5, Math.cos(this.yaw)),
+        this.species.length * 1.6 + 2.5
+      );
+    }
     this.camera.up.set(0, 1, 0);          // never roll the camera -> no nausea
     this.camera.lookAt(_camTarget);
+  }
+
+  /** Freeze / release the camera orbit. Returns the new state. */
+  toggleCamLock() {
+    this.camLock = !this.camLock;
+    if (this.camLock) {
+      this.camLockYaw = this.camYaw;
+      this.camLockPitch = this.camPitch;
+    }
+    return this.camLock;
   }
 
   idleAnimate(dt) { animateCreature(this.mesh, dt, 0.25); }

@@ -8,6 +8,8 @@ const KEY = 'abyssal-journal-v1';
 export const ACHIEVEMENTS = {
   all_species: { viet: 'Nhà hải dương học', desc: 'Ghi nhận đủ mọi loài' },
   all_biomes: { viet: 'Người vẽ hải đồ', desc: 'Đặt vây tới mọi vùng biển' },
+  whale_fall: { viet: 'Tiệc dưới đáy sâu', desc: 'Tìm thấy một xác cá voi' },
+  cleaning: { viet: 'Ghé trạm', desc: 'Tìm thấy một trạm vệ sinh trên rạn' },
   wreck: { viet: 'Thợ săn xác tàu', desc: 'Tìm thấy một con tàu đắm' },
   abyss: { viet: 'Chạm vực thẳm', desc: 'Lặn sâu quá 500 m' },
 };

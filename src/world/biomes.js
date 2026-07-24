@@ -4,7 +4,7 @@
 
 
 // Visual + terrain identity for each biome.
-import { earthFields, biomeWeightsAt, worldAt, WORLD_W } from './earth.js';
+import { biomeIdAt, biomeWeightsAt, worldAt, WORLD_W } from './earth.js';
 
 export const BIOME_DEF = {
   coral_reef: {
@@ -100,10 +100,10 @@ export const BIOME_DEF = {
 // Determine biome from continuous fields. Returns { biome, blend } where blend
 // helps smooth terrain across borders.
 export function biomeAt(noise, x, z) {
-  // Geography now decides this; see earth.js. Kept as a thin wrapper because
-  // chunk.js, chunkManager.js and the minimap all call it.
-  const { biome } = earthFields(noise, x, z);
-  return { biome };
+  // Geography decides this; see earth.js. Goes through the lean path rather
+  // than earthFields, which also resolves land and coast distance nobody here
+  // asked for.
+  return { biome: biomeIdAt(noise, x, z) };
 }
 
 export function biomeWeights(noise, x, z) {

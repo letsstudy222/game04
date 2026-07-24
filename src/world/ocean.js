@@ -93,7 +93,7 @@ export class Ocean {
   }
 
   // Called each frame with player position + current biome + daylight (0 night..1 noon).
-  update(dt, time, playerPos, biome, daylight = 1) {
+  update(dt, time, playerPos, biome, daylight = 1, flow = null) {
     // --- Fog & tint by depth + biome clarity + time of day ---
     const def = BIOME_DEF[biome] || BIOME_DEF.open_ocean;
     const depth = Math.max(0, -playerPos.y);
@@ -152,9 +152,15 @@ export class Ocean {
     this.plankton.position.set(playerPos.x, playerPos.y, playerPos.z);
     const arr = this.plankton.geometry.attributes.position.array;
     const R = this._plankRange;
+    // Plankton streams with the current. This is the only visual proof that a
+    // current exists — without it being carried feels like a bug rather than a
+    // feature, because nothing on screen is moving with you.
+    const fx = flow ? -flow.x * dt : 0;
+    const fz = flow ? -flow.z * dt : 0;
     for (let i = 0; i < arr.length; i += 3) {
       arr[i + 1] += Math.sin(time * 0.5 + i) * 0.004; // gentle vertical drift
-      arr[i] += Math.cos(time * 0.3 + i) * 0.003;
+      arr[i] += Math.cos(time * 0.3 + i) * 0.003 + fx;
+      arr[i + 2] += fz;
       // wrap
       for (let k = 0; k < 3; k++) {
         if (arr[i + k] > R) arr[i + k] -= R * 2;

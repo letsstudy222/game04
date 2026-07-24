@@ -19,6 +19,7 @@ export class ChunkManager {
     this._swayables = [];          // {group} with kelp to animate
     this._jellies = [];            // drifting jellyfish to animate
     this._wrecks = [];             // { node, pos } shipwrecks (for discovery)
+    this._landmarks = [];          // { kind, x, y, z } whale falls, cleaning stations
     this._lastChunk = null;
   }
 
@@ -39,6 +40,8 @@ export class ChunkManager {
     const built = buildChunk(this.noise, cx, cz);
     this.scene.add(built.terrain);
     this.scene.add(built.decor);
+
+    for (const L of built.landmarks || []) this._landmarks.push({ ...L, cx, cz });
 
     // collect animated decor (kelp sway, jellyfish drift) + wreck positions
     built.decor.children.forEach((d) => {
@@ -91,6 +94,7 @@ export class ChunkManager {
     this._swayables = this._swayables.filter((d) => d.parent !== rec.decor);
     this._jellies = this._jellies.filter((d) => d.parent !== rec.decor);
     this._wrecks = this._wrecks.filter((w) => w.node.parent !== rec.decor);
+    this._landmarks = this._landmarks.filter((L) => L.cx !== rec.cx || L.cz !== rec.cz);
 
     for (const c of rec.creatures) { this.scene.remove(c.mesh); this.creatureCount--; }
     for (const f of rec.flocks) {
@@ -170,6 +174,7 @@ export class ChunkManager {
     this._swayables = [];
     this._jellies = [];
     this._wrecks = [];
+    this._landmarks = [];
     this._lastChunk = null;
     this.creatureCount = 0;
   }
@@ -181,6 +186,7 @@ export class ChunkManager {
   }
 
   get wrecks() { return this._wrecks; }
+  get landmarks() { return this._landmarks; }
 
   // Ensure the starting area exists immediately (before first frame).
   primeAround(playerPos) {

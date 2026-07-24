@@ -16,6 +16,7 @@ export class HUD {
     el.innerHTML = `
       <div class="hud-line"><span class="hud-k">Loài</span><span id="hud-species" class="hud-v"></span></div>
       <div class="hud-line"><span class="hud-k">Vùng biển</span><span id="hud-biome" class="hud-v"></span></div>
+      <div class="hud-line hud-flow hidden" id="hud-flow-line"><span class="hud-k">Dòng chảy</span><span id="hud-flow" class="hud-v"></span></div>
       <div class="hud-line"><span class="hud-k">Độ sâu</span><span id="hud-depth" class="hud-v"></span></div>
       <div class="hud-line"><span class="hud-k">Tầng</span><span id="hud-zone" class="hud-v"></span></div>
       <div class="hud-line"><span class="hud-k">Toạ độ</span><span id="hud-coord" class="hud-v"></span></div>
@@ -27,6 +28,8 @@ export class HUD {
     `;
     this.$species = el.querySelector('#hud-species');
     this.$biome = el.querySelector('#hud-biome');
+    this.$flow = el.querySelector('#hud-flow');
+    this.$flowLine = el.querySelector('#hud-flow-line');
     this.$depth = el.querySelector('#hud-depth');
     this.$zone = el.querySelector('#hud-zone');
     this.$coord = el.querySelector('#hud-coord');
@@ -36,9 +39,17 @@ export class HUD {
 
   setSpecies(sp) { this.$species.textContent = `${sp.viet} (${sp.name})`; }
 
-  update(pos, biome, yaw, pitch = 0) {
+  update(pos, biome, yaw, pitch = 0, flowName = null, flowStrength = 0) {
     const depth = Math.max(0, -pos.y);
     this.$biome.textContent = BIOME_DEF[biome]?.label || biome;
+    // Only shown while actually inside a current, so the line appearing is
+    // itself the signal that you have drifted into one.
+    if (flowName) {
+      this.$flowLine.classList.remove('hidden');
+      this.$flow.textContent = `${flowName} · ${Math.round(flowStrength * 100)}%`;
+    } else {
+      this.$flowLine.classList.add('hidden');
+    }
     this.$depth.textContent = depth.toFixed(0) + ' m';
     const z = zoneFor(pos.y);
     this.$zone.textContent = z.viet;

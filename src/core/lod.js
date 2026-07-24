@@ -79,6 +79,12 @@ export const DETAIL = {
   high: { swim: [80, 48], whale: [96, 56], odd: [76, 52] },
   med: { swim: [46, 28], whale: [56, 34], odd: [44, 30] },
   low: { swim: [30, 20], whale: [36, 24], odd: [30, 22] },
+  // For migrating shoals only. At three hundred animals the per-fish triangle
+  // count is what decides whether the school is affordable: at `low` a shoal of
+  // 300 tuna came to 924k triangles, five times the rest of the scene. These
+  // are only ever seen as a mass at distance, so the silhouette is all that
+  // survives.
+  tiny: { swim: [14, 10], whale: [16, 12], odd: [14, 10] },
 };
 
 export function resFor(detail, kind) {

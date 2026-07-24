@@ -79,6 +79,7 @@ export const SPECIES = {
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean'],
     depth: [-1, -985],
+    dvm: 0.9,                     // 0-985 m, thuong 0-100 m; compendium ghi ro diel vertical migration
     schooling: true,
     schoolSize: [5, 12],
     speedFactor: 1.35,          // fast pelagic swimmer
@@ -117,6 +118,7 @@ export const SPECIES = {
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'kelp_forest'],
     depth: [-1, -1200],
+    dvm: 0.3,                     // theo con moi len xuong
     schooling: false,
     speedFactor: 1.0,
     info: {
@@ -173,6 +175,7 @@ export const SPECIES = {
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'coral_reef'],
     depth: [-0.5, -300],
+    dvm: 0.35,                     // san moi theo tang tan xa ban dem
     schooling: true,
     schoolSize: [4, 9],
     speedFactor: 1.3,
@@ -209,6 +212,7 @@ export const SPECIES = {
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'coral_reef'],
     depth: [-1, -1000],
+    dvm: 0.7,                     // lan vao deep scattering layer de an
     schooling: false,
     speedFactor: 0.8,
     info: {
@@ -237,6 +241,7 @@ export const SPECIES = {
     homeBiome: 'deep_sea',
     spawnBiomes: ['deep_sea'],
     depth: [-100, -1500],
+    dvm: 0.25,                     // chu yeu o sau, chi nhich nhe
     schooling: false,
     speedFactor: 0.4,
     info: {
@@ -265,6 +270,7 @@ export const SPECIES = {
     homeBiome: 'deep_sea',
     spawnBiomes: ['deep_sea'],
     depth: [-300, -1000],
+    dvm: 0.45,                     // meso- den bathypelagic, theo tang tan xa
     schooling: false,
     speedFactor: 0.75,
     info: {
@@ -293,6 +299,7 @@ export const SPECIES = {
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'kelp_forest'],
     depth: [-0.8, -644],
+    dvm: 0.85,                     // lan xuong nuoc lanh sau roi noi len suoi nang lai o mat
     schooling: false,
     speedFactor: 0.35,
     info: {

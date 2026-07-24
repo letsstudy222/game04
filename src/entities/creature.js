@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { SPECIES } from '../data/species.js';
+import { preferredDepth } from '../world/dsl.js';
 import { cruiseFor } from '../config.js';
 import { buildCreature, animateCreature } from './fishMesh.js';
 
@@ -9,6 +10,10 @@ const _tmp = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 
 export class Creature {
+  // Shared clock rather than a parameter threaded through Flock, ChunkManager
+  // and every update signature in between. One writer, many readers.
+  static daylight = 1;
+
   constructor(species, pos) {
     this.species = species;
     // NPCs never need the player's vertex count; small ones need even less
@@ -95,6 +100,19 @@ export class Creature {
     const floor = getFloorY(this.mesh.position.x, this.mesh.position.z);
     if (this.mesh.position.y < floor + this.species.length * 1.2) {
       this.vel.y += this.speed * dt * 1.5;
+    }
+
+    // Follow the scattering layer up at dusk and back down at dawn. This is a
+    // nudge, not a rail: fish still wander, they just wander around a depth
+    // that moves through the day.
+    if (this.species.dvm) {
+      const want = preferredDepth(this.species, Creature.daylight);
+      if (want !== null) {
+        const err = want - this.mesh.position.y;
+        if (Math.abs(err) > this.species.length * 2) {
+          this.vel.y += Math.sign(err) * this.speed * dt * 0.55 * this.species.dvm;
+        }
+      }
     }
     // Surface: air-breathing and surface-basking species are allowed right up
     // to the waterline; everything else keeps a body length of clearance.

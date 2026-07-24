@@ -625,6 +625,11 @@ export const ODD_PLANS = {
 
   /* ----------------------------------------------------------- GIANT SQUID */
   squid: {
+    // A jetting squid travels MANTLE FIRST — the pointed end with the fins
+    // leads and the arms stream out behind. The plan is authored the other way
+    // round (t = 0 is the arm crown), which put the tassel of arms in front and
+    // read as the animal swimming backwards.
+    faceReverse: true,
     bodyLength: 1.22,          // head + mantle, in mantle-length units
     norm: (L) => L / 3.4,      // mantle tip to tentacle tip, arms relaxed
     stations: [
@@ -1706,6 +1711,18 @@ export function buildOddity(species, key, { variant, detail = 'med' } = {}) {
   plan.parts(root, species);
 
   root._anim = { ...plan.anim, t: Math.random() * 6 };
+
+  // Some animals are authored nose-at-minus-Z. Rather than rewrite every
+  // station and part offset, the whole assembly is nested in a group turned
+  // half a turn. creature.js calls lookAt() on the OUTER object, so the flip
+  // has to live inside it or the next frame would overwrite it.
+  if (plan.faceReverse) {
+    const inner = new THREE.Group();
+    inner.rotation.y = Math.PI;
+    for (const c of [...root.children]) inner.add(c);
+    root.add(inner);
+  }
+
   root.scale.setScalar(plan.norm(species.length));
   root.userData.species = species.id;
   root.userData.sizeRef = species.length;
