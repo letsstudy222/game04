@@ -2,7 +2,6 @@
 // Sizes are REAL SCALE (meters). Biome + depth define where each one lives.
 // To add a species: copy a block, keep the same fields. That's the only edit needed.
 
-export const BIOMES = ['coral_reef', 'kelp_forest', 'open_ocean', 'polar', 'deep_sea'];
 
 export const SPECIES = {
   clownfish: {
@@ -13,6 +12,13 @@ export const SPECIES = {
     length: 0.09,                 // ~9 cm
     shape: 'fish',
     colors: { body: 0xff7a1a, band: 0xffffff, fin: 0x1c1c1c, belly: 0xffb060 },
+    // Amphiprion ocellaris: deep body (42-48% of standard length), ROUNDED
+    // caudal fin, three white bars thinly outlined in black.
+    morph: {
+      profile: 'deep', pattern: 'bars3',
+      fork: -0.45, caudSpan: 0.076, caudLen: 0.076,
+      finRim: 0xf4f6f5, iris: 0xd08a2a,
+    },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef'],
     depth: [-1, -15],            // reef flats & slopes
@@ -99,6 +105,15 @@ export const SPECIES = {
     length: 4.6,
     shape: 'shark',
     colors: { body: 0x6f7c85, band: 0x8a969d, fin: 0x5b666d, belly: 0xeef1f2 },
+    // Lamnid build: pointed conical snout, near-lunate tail, hard caudal keel,
+    // and the famously abrupt, ragged line where slate back meets white belly.
+    morph: {
+      depth: 1.0, width: 1.0, snoutW: 0.86, snoutH: 0.94,
+      d1: 1.0, d1z: 0.38, d2: 1.0, pectoral: 1.0,
+      caudalLower: 0.82, keel: 0.18, interdorsal: false,
+      edgeWobble: 0.26, edgeSharp: 0.10, edgeY: -0.16,
+      eyeR: 0.0135, eyeIris: 0x1b2228, eyePupil: 0x06070a,
+    },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'kelp_forest'],
     depth: [-1, -1200],
@@ -183,7 +198,14 @@ export const SPECIES = {
     scientific: 'Mobula birostris',
     length: 4.5,                // wingspan
     shape: 'ray',
-    colors: { body: 0x2b3540, fin: 0x1f2830, belly: 0xe8eef0 },
+    colors: { body: 0x63798c, fin: 0x33414f, belly: 0xe8eef0 },
+    // Disc width runs ~2.2–2.4x disc length (compendium), so discLen 0.44 in
+    // wingspan units puts the ratio at 2.27.
+    morph: {
+      disc: 'manta',
+      discLen: 0.44,
+      tailLen: 0.46,
+    },
     homeBiome: 'open_ocean',
     spawnBiomes: ['open_ocean', 'coral_reef'],
     depth: [-1, -1000],
@@ -352,6 +374,16 @@ export const SPECIES = {
     viet: 'Cá thòi lòi', scientific: 'Periophthalmodon schlosseri',
     length: 0.25, shape: 'fish',
     colors: { body: 0x6a5c3f, band: 0x3d3626, fin: 0x8a7a55, belly: 0xc9bb96 },
+    // Periophthalmodon schlosseri: elongate and sub-cylindrical, NOT a deep
+    // reef fish. Two dorsal fins, muscular arm-like pectorals it walks on, and
+    // periscope eyes on top of the skull.
+    morph: {
+      profile: 'elongate', pattern: 'mud',
+      fork: -0.35, caudSpan: 0.046, caudLen: 0.058, caudZ: 0.95,
+      mouthY: -0.06, mouthTo: 0.09, mouthW: 0.0030,
+      eyeT: 0.10, iris: 0x8a7238, gillV: 0.19,
+      shadeLo: 0.25, shadeHi: 0.85,
+    },
     homeBiome: 'mangrove', spawnBiomes: ['mangrove'],
     depth: [-0.3, -2], schooling: false, speedFactor: 0.5,
     info: {
@@ -371,6 +403,18 @@ export const SPECIES = {
     viet: 'Cá măng bắn nước', scientific: 'Toxotes jaculatrix',
     length: 0.22, shape: 'fish',
     colors: { body: 0xdfe4e6, band: 0x24262b, fin: 0xb9c2c6, belly: 0xf2f5f5 },
+    // Toxotes jaculatrix: straight dorsal profile, pointed head, SUPERIOR
+    // (upward-slanting) mouth, dorsal fin set far back, and 4-6 wedge-shaped
+    // dark bars that are broad on the back and fade out before the belly.
+    morph: {
+      profile: 'archer', pattern: 'wedges',
+      dorsalZ: 0.58, analZ: 0.66,
+      dorsal: [[0, 0.052], [0.030, 0.046], [0.046, 0.006], [0.032, -0.040], [0.006, -0.052]],
+      fork: 0.15, caudSpan: 0.080, caudLen: 0.082,
+      mouthY: 0.16, mouthTo: 0.09, mouthW: 0.0016,
+      eyeT: 0.075, eyeR: 0.030, eyeX: 0.86, eyeY: 0.50,
+      iris: 0x3b4a52, gillV: 0.20,
+    },
     homeBiome: 'mangrove', spawnBiomes: ['mangrove'],
     depth: [-0.2, -1.5], schooling: true, schoolSize: [4, 9], speedFactor: 0.7,
     info: {
@@ -389,7 +433,23 @@ export const SPECIES = {
     id: 'mud_crab', name: 'Giant Mud Crab',
     viet: 'Cua bùn', scientific: 'Scylla serrata',
     length: 0.20, shape: 'crab',
-    colors: { body: 0x2f4436, fin: 0x4d6b4a, belly: 0xbfc7a8 },
+    // NOTE: procedural skin textures in this project are written straight from
+    // THREE.Color components, which are LINEAR while ColorManagement is on, so
+    // a declared hex lands in the texture much darker than it looks. These
+    // values are chosen for how they READ once written, not on the swatch:
+    // 0x2f4436 would arrive as (7,15,9) — effectively black.
+    colors: { body: 0x7c9481, band: 0x47584c, fin: 0x8aa38d, belly: 0xd2d8bd },
+    // Scylla serrata: broad smooth oval carapace with NINE even anterolateral
+    // teeth per side, two spines on each wrist, dark green with polygonal
+    // marbling over legs and claws, and the last leg pair flattened into
+    // swimming paddles.
+    morph: {
+      shellPattern: 'marbled',
+      teeth: 9, frontSpines: 0,
+      paddle: true, carpalSpines: 2,
+      gloss: 0.62, toothLen: 0.044, legBands: false,
+      accentCol: 0x3d5540, handCol: 0x6f8a63, tipCol: 0x14100e,
+    },
     homeBiome: 'mangrove', spawnBiomes: ['mangrove'],
     depth: [-0.3, -6], schooling: false, speedFactor: 0.14, benthic: true,
     info: {
@@ -409,6 +469,18 @@ export const SPECIES = {
     viet: 'Cá mập chanh', scientific: 'Negaprion brevirostris',
     length: 2.4, shape: 'shark',
     colors: { body: 0xa9975c, band: 0xc4b47c, fin: 0x8e7e4c, belly: 0xeee7cf },
+    // Negaprion brevirostris: short broad FLATTENED snout, and a second dorsal
+    // fin nearly the size of the first — the one field mark that settles the
+    // identification. Countershading grades softly because the animal hides
+    // against sand rather than against open blue water.
+    morph: {
+      depth: 0.93, width: 0.96, snoutW: 1.32, snoutH: 0.78,
+      d1: 0.86, d1z: 0.42, d2: 3.35, pectoral: 0.92,
+      caudalLower: 0.55, keel: 0.04, interdorsal: false,
+      edgeWobble: 0.15, edgeSharp: 0.34, edgeY: -0.24,
+      eyeR: 0.0105, eyeIris: 0x6f6a3c, eyePupil: 0x0a0b0d,
+      toothShow: 0.55,
+    },
     homeBiome: 'mangrove', spawnBiomes: ['mangrove', 'seagrass'],
     depth: [-0.8, -90], schooling: true, schoolSize: [2, 5], speedFactor: 0.85,
     info: {
@@ -487,6 +559,16 @@ export const SPECIES = {
     viet: 'Cá đuối đốm xanh', scientific: 'Taeniura lymma',
     length: 0.35, shape: 'ray',
     colors: { body: 0xb08a3e, fin: 0x8c6c2e, belly: 0xf0ead6 },
+    // Taeniura lymma is NOT a small manta: rounded oval disc, no cephalic fins,
+    // mouth underneath, eyes bulging from the top of the disc, and a long thick
+    // tail carrying two blue stripes, a deep ventral fin fold and the stings.
+    // Disc width is ~0.8x disc LENGTH (the disc is elongated, not circular),
+    // hence discLen 1.25 in disc-width units.
+    morph: {
+      disc: 'oval',
+      discLen: 1.25,
+      tailLen: 1.30,
+    },
     homeBiome: 'seagrass', spawnBiomes: ['seagrass', 'coral_reef'],
     depth: [-0.5, -30], schooling: false, speedFactor: 0.55,
     info: {
@@ -508,6 +590,17 @@ export const SPECIES = {
     viet: 'Cá mập rạn Caribe', scientific: 'Carcharhinus perezi',
     length: 2.2, shape: 'shark',
     colors: { body: 0x7d7f78, band: 0x94968d, fin: 0x63655f, belly: 0xeceee9 },
+    // Carcharhinus perezi: robust requiem body, short rounded snout, plain
+    // unmarked fins, and the low interdorsal ridge that separates it from its
+    // congeners.
+    morph: {
+      depth: 0.99, width: 0.97, snoutW: 1.14, snoutH: 0.93,
+      d1: 0.92, d1z: 0.40, d2: 1.35, pectoral: 0.98,
+      caudalLower: 0.56, keel: 0.06, interdorsal: true,
+      edgeWobble: 0.14, edgeSharp: 0.17, edgeY: -0.20,
+      eyeR: 0.0118, eyeIris: 0x3f4a44, eyePupil: 0x08090b,
+      toothShow: 0.6,
+    },
     homeBiome: 'blue_hole', spawnBiomes: ['blue_hole', 'coral_reef'],
     depth: [-1, -65], schooling: true, schoolSize: [2, 6], speedFactor: 0.95,
     info: {
@@ -532,6 +625,13 @@ export const SPECIES = {
     length: 0.05,
     shape: 'fish',
     colors: { body: 0x6fe6d0, band: 0xaef4ff, fin: 0x3fbfae, belly: 0xdffaf5 },
+    // Chromis viridis: short and deep, no bars, and a distinctly FORKED caudal
+    // fin — the quickest way to tell it from a clownfish at a distance.
+    morph: {
+      profile: 'deep', depth: 0.97, width: 0.94,
+      fork: 1.05, caudSpan: 0.088, caudLen: 0.104,
+      iris: 0x8fd4c0, shadeLo: 0.10, shadeHi: 0.80,
+    },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
     depth: [-1, -20],
@@ -590,7 +690,18 @@ export const SPECIES = {
     scientific: 'Carpilius maculatus',
     length: 0.18,
     shape: 'crab',
-    colors: { body: 0xb8341d, fin: 0xe0cdae, belly: 0xf0e3cd },
+    colors: { body: 0xefd3bd, band: 0x8d2440, fin: 0xe0cdae, belly: 0xf4ead9 },
+    // Carpilius maculatus, the "seven-eleven crab": a very smooth, glossy,
+    // convex carapace on a cream-to-pink ground carrying nine large violet-
+    // maroon blotches in 2-3-4 rows, a smooth margin with no large teeth, and
+    // only four small spines between the eyes. No swimming paddles.
+    morph: {
+      shellPattern: 'spots711',
+      teeth: 0, frontSpines: 4,
+      paddle: false, carpalSpines: 0,
+      gloss: 0.34, grooveDepth: 0.32,
+      accentCol: 0xc9705a, handCol: 0xf0e3cd, bandCol: 0x8f6742,
+    },
     homeBiome: 'coral_reef',
     spawnBiomes: ['coral_reef', 'kelp_forest'],
     depth: [-0.5, -35],

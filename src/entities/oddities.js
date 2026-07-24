@@ -21,8 +21,10 @@ const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
  * and eyes stayed at their old coordinates and ended up buried inside the body.
  * Anchoring to the surface makes the parts follow any change to the stations.
  */
-export function surfaceAt(plan, t, key) {
-  const st = plan.stations;
+export function surfaceAt(plan, t, key, sp = null) {
+  // A plan may author its stations directly, or derive them per species (the
+  // ray plan serves both a manta and a stingray). Resolve either form.
+  const st = typeof plan.stations === 'function' ? plan.stations(sp) : plan.stations;
   for (let i = 0; i < st.length - 1; i++) {
     if (t >= st[i].t && t <= st[i + 1].t) {
       const k = (t - st[i].t) / (st[i + 1].t - st[i].t);
@@ -45,46 +47,193 @@ function eyes(root, { r, x, y, z, iris, pupil = 0x0a0b0d }) {
   }
 }
 
+/* ------------------------------------------------------- ray disc profiles */
+
+// Mobula birostris: a wide diamond with drawn-out, pointed wingtips. Disc width
+// runs about 2.2–2.4x the disc length, so the plan is short in Z and very broad.
+const DISC_MANTA = [
+  { t: 0.00, w: 0.085, hTop: 0.016, hBot: 0.013, yOff: 0 },
+  { t: 0.07, w: 0.200, hTop: 0.028, hBot: 0.023, yOff: 0 },
+  { t: 0.16, w: 0.315, hTop: 0.036, hBot: 0.029, yOff: 0 },
+  { t: 0.28, w: 0.425, hTop: 0.039, hBot: 0.030, yOff: 0 },
+  { t: 0.40, w: 0.487, hTop: 0.035, hBot: 0.026, yOff: 0 },
+  { t: 0.50, w: 0.500, hTop: 0.029, hBot: 0.021, yOff: 0 },
+  { t: 0.62, w: 0.440, hTop: 0.022, hBot: 0.015, yOff: 0 },
+  { t: 0.74, w: 0.330, hTop: 0.015, hBot: 0.010, yOff: 0 },
+  { t: 0.85, w: 0.205, hTop: 0.010, hBot: 0.007, yOff: 0 },
+  { t: 0.94, w: 0.100, hTop: 0.006, hBot: 0.004, yOff: 0 },
+  { t: 1.00, w: 0.030, hTop: 0.003, hBot: 0.002, yOff: 0 },
+];
+
+// Taeniura lymma: a rounded oval, and markedly THICKER through the body than a
+// manta — roughly 13% of disc width against the manta's 6%. Widths follow an
+// ellipse rather than a diamond, so there are no drawn-out wingtips.
+const DISC_OVAL = [
+  { t: 0.00, w: 0.090, hTop: 0.030, hBot: 0.024, yOff: 0 },
+  { t: 0.07, w: 0.250, hTop: 0.048, hBot: 0.038, yOff: 0 },
+  { t: 0.16, w: 0.362, hTop: 0.064, hBot: 0.050, yOff: 0 },
+  { t: 0.28, w: 0.448, hTop: 0.074, hBot: 0.058, yOff: 0 },
+  { t: 0.40, w: 0.489, hTop: 0.072, hBot: 0.056, yOff: 0 },
+  { t: 0.50, w: 0.500, hTop: 0.066, hBot: 0.050, yOff: 0 },
+  { t: 0.62, w: 0.484, hTop: 0.055, hBot: 0.041, yOff: 0 },
+  { t: 0.74, w: 0.438, hTop: 0.042, hBot: 0.030, yOff: 0 },
+  { t: 0.85, w: 0.356, hTop: 0.029, hBot: 0.020, yOff: 0 },
+  { t: 0.94, w: 0.236, hTop: 0.018, hBot: 0.012, yOff: 0 },
+  { t: 1.00, w: 0.080, hTop: 0.011, hBot: 0.007, yOff: 0 },
+];
+
+/**
+ * Distinct round spots, as on a bluespotted ribbontail ray. Value noise alone
+ * produces blotches; real spots need cell structure, so this is a cheap Worley
+ * field. Cells wrap in u so there is no seam down the side of the animal.
+ * Returns the distance to the nearest cell centre and that cell's radius.
+ */
+function spotField(u, v, density, seed) {
+  const D = Math.round(density);
+  const gx = u * D, gy = v * D;
+  const ix = Math.floor(gx), iy = Math.floor(gy);
+  let best = 9, second = 9, br = 0.3, bid = 0;
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const cx = ix + dx, cy = iy + dy;
+      const wx = ((cx % D) + D) % D;          // wrap so u = 0 and u = 1 agree
+      const jx = mottle(wx * 1.7 + seed, cy * 2.3 + seed);
+      const jy = mottle(wx * 3.1 + seed, cy * 1.1 - seed);
+      const d = Math.hypot(gx - (cx + jx), gy - (cy + jy));
+      if (d < best) { second = best; best = d; br = 0.15 + jx * 0.15; bid = jy; }
+      else if (d < second) { second = d; }
+    }
+  }
+  // (second - best) is near zero exactly on a cell boundary, which is what
+  // draws the polygon edges of a mud crab's marbling.
+  return { d: best, r: br, id: bid, edge: second - best };
+}
+
+/** Scratch colour for vertex-shaded appendages. */
+const _tc = new THREE.Color();
+
+/**
+ * A thin membrane hanging beneath a tail — the "ribbon" of a ribbontail ray.
+ *
+ * foil() cannot do this job: it fan-triangulates from a single corner, which
+ * degenerates on a long sliver, and its thickness taper follows vertex index
+ * rather than distance from the root. Worse, an outline of a handful of points
+ * gives a lower edge made of straight segments, which reads as chunky and
+ * faceted. Here the depth profile is sampled densely instead, so the fold has
+ * a smooth continuous margin.
+ *
+ * @param {number} zStart  z where the fold begins (nearest the body)
+ * @param {number} zEnd    z at the tail tip
+ * @param {function} depthAt  (k 0..1) => depth below the tail axis
+ */
+function finFold(zStart, zEnd, depthAt, n = 26, thickness = 0.0018) {
+  const pos = [], idx = [];
+  for (let i = 0; i <= n; i++) {
+    const k = i / n;
+    const z = zStart + (zEnd - zStart) * k;
+    const d = depthAt(k);
+    for (const s of [-1, 1]) {
+      pos.push(s * thickness, 0, z);           // upper edge, on the tail axis
+      pos.push(s * thickness * 0.35, -d, z);   // lower margin, thinner
+    }
+  }
+  const S = 4;   // per station: (-t top), (-t bot), (+t top), (+t bot)
+  for (let i = 0; i < n; i++) {
+    const a = i * S, b = (i + 1) * S;
+    idx.push(a, a + 1, b, b, a + 1, b + 1);               // left face
+    idx.push(a + 2, b + 2, a + 3, a + 3, b + 2, b + 3);   // right face
+    idx.push(a + 1, a + 3, b + 1, b + 1, a + 3, b + 3);   // lower rim
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Ray colours resolved once per species rather than per texel.
+const _rayPal = new Map();
+function rayPal(sp) {
+  let p = _rayPal.get(sp.id);
+  if (!p) {
+    p = {
+      back: new THREE.Color(sp.colors.body),
+      deep: new THREE.Color(sp.colors.fin ?? sp.colors.body),
+      belly: new THREE.Color(sp.colors.belly),
+      patch: new THREE.Color(0xdae3e9),
+      dark: new THREE.Color(0x39424b),
+      spot: new THREE.Color(0x2fc9f5),
+      spotRim: new THREE.Color(0x0d5f86),
+    };
+    _rayPal.set(sp.id, p);
+  }
+  return p;
+}
+
 export const ODD_PLANS = {
 
-  /* ------------------------------------------------------------- MANTA RAY */
+  /* ------------------------------------------------------------------- RAYS */
+  // Two very different animals share this plan: the giant manta (a broad
+  // diamond with cephalic fins and a terminal mouth) and the bluespotted
+  // ribbontail ray (a thick rounded oval with a ventral mouth, protruding eyes
+  // and a long striped tail). `morph.disc` selects which.
   ray: {
-    bodyLength: 0.46,          // disc length, in units where wingspan = 1
-    norm: (L) => L / 1.0,      // species.length is the WINGSPAN
-    stations: [
-      { t: 0.00, w: 0.085, hTop: 0.016, hBot: 0.013, yOff: 0 },
-      { t: 0.07, w: 0.200, hTop: 0.028, hBot: 0.023, yOff: 0 },
-      { t: 0.16, w: 0.315, hTop: 0.036, hBot: 0.029, yOff: 0 },
-      { t: 0.28, w: 0.425, hTop: 0.039, hBot: 0.030, yOff: 0 },
-      { t: 0.40, w: 0.487, hTop: 0.035, hBot: 0.026, yOff: 0 },
-      { t: 0.50, w: 0.500, hTop: 0.029, hBot: 0.021, yOff: 0 },
-      { t: 0.62, w: 0.440, hTop: 0.022, hBot: 0.015, yOff: 0 },
-      { t: 0.74, w: 0.330, hTop: 0.015, hBot: 0.010, yOff: 0 },
-      { t: 0.85, w: 0.205, hTop: 0.010, hBot: 0.007, yOff: 0 },
-      { t: 0.94, w: 0.100, hTop: 0.006, hBot: 0.004, yOff: 0 },
-      { t: 1.00, w: 0.030, hTop: 0.003, hBot: 0.002, yOff: 0 },
-    ],
-    // Wings must thin towards the tip; a plain ellipse stays fat too far out.
-    yScale: (t, ct) => 0.05 + Math.exp(-Math.pow(ct / 0.42, 2)),
+    bodyLength: (sp) => sp.morph?.discLen ?? 0.44,
+    norm: (L) => L / 1.0,      // species.length is the DISC WIDTH (wingspan)
+    stations: (sp) => (sp.morph?.disc === 'oval' ? DISC_OVAL : DISC_MANTA),
+    // Margins must thin towards the edge; a plain ellipse stays fat too far out.
+    yScaleFor: (sp) => {
+      const k = sp.morph?.disc === 'oval' ? 0.50 : 0.42;
+      const floor = sp.morph?.disc === 'oval' ? 0.06 : 0.05;
+      return (t, ct) => floor + Math.exp(-Math.pow(ct / k, 2));
+    },
     anim: { kind: 'wingwave', freq: 0.55, amp: 0.055, wave: 2.2 },
-    skin(u, v) {
+    skin(u, v, sp) {
+      const p = rayPal(sp);
       const s = Math.sin(u * Math.PI * 2);
-      if (s > 0) {
-        // Dorsal: slate blue-grey. Photographs look near-black only because
-        // of backlighting; lit from above a manta reads clearly blue-grey,
-        // with the pale shoulder patches standing out strongly.
-        _c.set(0x63798c).lerp(new THREE.Color(0x33414f), ss(0, 1, s));
+      const oval = sp.morph?.disc === 'oval';
+
+      if (oval) {
+        if (s > 0) {
+          // Dorsal: yellow-brown ground carrying the neon-blue spots that warn
+          // of the tail spines. Spots are brightest on the disc centre and thin
+          // out towards the margin, as in life.
+          _c.copy(p.back).lerp(p.deep, ss(0.15, 1, s) * 0.5);
+          _c.offsetHSL(0, 0, (mottle(v * 20, u * 9) - 0.5) * 0.07);
+          const { d, r } = spotField(u, v, 13, 4.1);
+          const core = 1 - ss(r * 0.62, r * 0.95, d);
+          const rim = (1 - ss(r * 0.95, r * 1.25, d)) - core;
+          const fade = ss(0.03, 0.16, v) * (1 - ss(0.86, 0.99, v));
+          _c.lerp(p.spotRim, Math.max(0, rim) * 0.55 * fade);
+          _c.lerp(p.spot, core * 0.92 * fade);
+        } else {
+          // Ventral: plain cream, with the mouth and five gill slit pairs.
+          _c.copy(p.belly);
+          const lat = Math.abs(Math.cos(u * Math.PI * 2));
+          const mouth = Math.exp(-Math.pow((v - 0.16) / 0.045, 2))
+                      * Math.exp(-Math.pow(lat / 0.20, 2));
+          _c.multiplyScalar(1 - mouth * 0.7);
+          for (let i = 0; i < 5; i++) {
+            const gv = 0.24 + i * 0.040;
+            const d = Math.hypot((v - gv) * 6, (lat - 0.20) * 1.7);
+            _c.multiplyScalar(1 - Math.exp(-(d * d) / 0.02) * 0.5);
+          }
+        }
+      } else if (s > 0) {
+        // Manta dorsal: slate blue-grey. Photographs look near-black only
+        // because of backlighting; lit from above a manta reads clearly
+        // blue-grey, with the pale shoulder patches standing out strongly.
+        _c.copy(p.back).lerp(p.deep, ss(0, 1, s));
         const patch = Math.exp(-Math.pow((v - 0.19) / 0.10, 2))
                     * Math.exp(-Math.pow((Math.abs(Math.cos(u * Math.PI * 2)) - 0.30) / 0.19, 2));
-        _c.lerp(new THREE.Color(0xdae3e9), patch * 0.95);
-        // faint lighter mottling across the wings
+        _c.lerp(p.patch, patch * 0.95);
         _c.offsetHSL(0, 0, (mottle(v * 18, u * 8) - 0.5) * 0.09);
       } else {
-        // Ventral: white with the unique spot pattern used to ID individuals.
-        _c.set(0xe9eef0);
-        const sp = mottle(v * 22, u * 9);
-        if (sp > 0.80 && v > 0.25 && v < 0.75) _c.lerp(new THREE.Color(0x39424b), (sp - 0.80) * 4);
-        // five gill slits either side of the mouth
+        // Manta ventral: white with the unique spot pattern used to ID
+        // individual animals.
+        _c.copy(p.belly);
+        const q = mottle(v * 22, u * 9);
+        if (q > 0.80 && v > 0.25 && v < 0.75) _c.lerp(p.dark, (q - 0.80) * 4);
         for (let i = 0; i < 5; i++) {
           const gv = 0.20 + i * 0.045;
           const lat = Math.abs(Math.cos(u * Math.PI * 2));
@@ -95,22 +244,135 @@ export const ODD_PLANS = {
       _c.offsetHSL(0, 0, (mottle(v * 70, u * 30) - 0.5) * 0.04);
       return [_c.r, _c.g, _c.b];
     },
-    bump: (u, v) => 0.55 + (mottle(v * 80, u * 34) - 0.5) * 0.05,
+    bump(u, v, sp) {
+      let h = 0.55 + (mottle(v * 80, u * 34) - 0.5) * 0.05;
+      // the ribbontail's spiracles sit just behind the eyes as real hollows
+      if (sp.morph?.disc === 'oval' && Math.sin(u * Math.PI * 2) > 0) {
+        const lat = Math.cos(u * Math.PI * 2);
+        const d = Math.hypot((v - 0.26) * 5, (Math.abs(lat) - 0.17) * 2.2);
+        h -= Math.exp(-(d * d) / 0.03) * 0.35;
+        // small flat denticles run the midback in adults
+        if (Math.abs(lat) < 0.22) {
+          h += (mottle(v * 150, u * 60) - 0.5) * 0.10 * (1 - ss(0.75, 0.95, v));
+        }
+      }
+      return h;
+    },
     groove: () => 0,
     parts(root, sp) {
+      const m = sp.morph || {};
+      const BL = m.discLen ?? 0.44;
+      const zAt = (t) => (0.5 - t) * BL;
+
+      if (m.disc === 'oval') {
+        /* ---------------------------------- bluespotted ribbontail ray ----
+         * Sources describe the tail as broad-based and DEPRESSED, tapering
+         * rapidly to the stings and slightly compressed beyond them, with a
+         * deep ventral cutaneous fold running all the way to the tip — that
+         * fold is what "ribbontail" refers to, and a plain tapered cylinder
+         * misses it entirely. The stings sit further back than on most
+         * stingrays. A very low fleshy ridge runs the dorsal midline.
+         */
+        const TL = m.tailLen ?? 1.30;
+        const zBase = zAt(1.0);
+        const bodyCol = new THREE.Color(sp.colors.body);
+        const blueCol = new THREE.Color(0x1fb4ea);
+
+        // --- tail core: wider than tall at the base, narrowing past the sting
+        const tailGeo = organicBody({
+          stations: [
+            { t: 0.00, w: 0.080, hTop: 0.030, hBot: 0.028, yOff: 0 },
+            { t: 0.12, w: 0.062, hTop: 0.025, hBot: 0.024, yOff: 0 },
+            { t: 0.28, w: 0.042, hTop: 0.020, hBot: 0.019, yOff: 0 },
+            { t: 0.45, w: 0.028, hTop: 0.016, hBot: 0.015, yOff: 0 },
+            { t: 0.58, w: 0.021, hTop: 0.015, hBot: 0.013, yOff: 0 },
+            { t: 0.72, w: 0.014, hTop: 0.014, hBot: 0.012, yOff: 0 },
+            { t: 0.85, w: 0.009, hTop: 0.012, hBot: 0.010, yOff: 0 },
+            { t: 0.94, w: 0.006, hTop: 0.009, hBot: 0.008, yOff: 0 },
+            { t: 1.00, w: 0.003, hTop: 0.006, hBot: 0.005, yOff: 0 },
+          ],
+          length: TL, 
+          // Follow the LOD tier the disc was built at rather than hardcoding —
+          // a distant ray must not pay for a full-resolution tail.
+          segments: Math.max(14, Math.round((root._segments ?? 44) * 0.55)),
+          radial: Math.max(8, Math.round((root._radial ?? 16) * 0.32)),
+          groove: (t, th) => -Math.pow(Math.max(0, Math.sin(th)), 16) * 0.10,
+          shade: (t, th) => {
+            // the pair of blue side-stripes the species is known for
+            const lat = Math.pow(Math.abs(Math.cos(th)), 5);
+            const along = ss(0.02, 0.14, t) * (1 - ss(0.84, 1.0, t));
+            return _tc.copy(bodyCol).lerp(blueCol, lat * along * 0.95);
+          },
+        });
+        const tail = new THREE.Mesh(tailGeo, new THREE.MeshStandardMaterial(
+          { vertexColors: true, roughness: 0.6 }));
+        tail.position.z = zBase - TL / 2;
+        root.add(tail);
+        root._tail = tail;
+
+        // --- deep ventral fin fold, reaching the tail tip
+        const foldMat = new THREE.MeshStandardMaterial({
+          color: sp.colors.body, roughness: 0.62, side: THREE.DoubleSide });
+        const fold = new THREE.Mesh(finFold(
+          zBase - 0.16 * TL, zBase - TL,
+          // deepest a little past mid-tail, still present at the very tip
+          (k) => 0.058 * ss(0, 0.26, k) * (1 - ss(0.70, 1.0, k) * 0.80),
+          Math.max(12, Math.round((root._segments ?? 44) * 0.45)),
+        ), foldMat);
+        root.add(fold);
+
+        // --- stings: usually two, set well back, flat blades rather than spikes
+        const stingMat = new THREE.MeshStandardMaterial(
+          { color: 0x40372c, roughness: 0.45 });
+        for (const [k, s] of [[0.54, 1.0], [0.60, 0.76]]) {
+          const st = new THREE.Mesh(
+            new THREE.ConeGeometry(0.012 * s, 0.125 * s, 5), stingMat);
+          st.scale.x = 0.32;
+          st.rotation.x = -Math.PI / 2 - 0.30;
+          st.position.set(0, 0.013, zBase - k * TL);
+          root.add(st);
+        }
+
+        // --- pelvic fins: moderate and slender, tucked behind the disc
+        for (const s of [-1, 1]) {
+          const pv = new THREE.Mesh(foil([
+            [0.000, 0.000], [0.062, -0.018], [0.082, -0.070],
+            [0.036, -0.086], [0.005, -0.042],
+          ], 0.004, 0.4), foldMat);
+          pv.scale.x = s;
+          pv.position.set(s * 0.070, -0.004, zAt(0.88));
+          root.add(pv);
+        }
+
+        // Large protruding eyes on TOP of the disc — the feature that most
+        // separates this animal from an eagle ray or a manta at a glance.
+        const eT = 0.20;
+        eyes(root, {
+          r: 0.030,
+          x: 0.088,
+          y: surfaceAt({ stations: DISC_OVAL }, eT, 'hTop') * 0.86,
+          z: zAt(eT),
+          iris: 0xe0b03a, pupil: 0x120e08,
+        });
+        return;
+      }
+
+      /* --------------------------------------------------- giant manta ---- */
       const dark = new THREE.MeshStandardMaterial({ color: 0x4a5b6b, roughness: 0.72 });
       // cephalic fins — the twin paddles that funnel plankton to the mouth
       for (const s of [-1, 1]) {
         const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.030, 0.115, 10), dark);
         horn.rotation.x = Math.PI / 2 + 0.35;
         horn.rotation.z = s * 0.22;
-        horn.position.set(s * 0.062, -0.012, 0.23 + 0.05);
+        horn.position.set(s * 0.062, -0.012, zAt(0.0) + 0.05);
         root.add(horn);
       }
       // whip tail
-      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.011, 0.46, 6), dark);
+      const tLen = m.tailLen ?? 0.46;
+      const tail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.003, 0.011, tLen, 6), dark);
       tail.rotation.x = Math.PI / 2;
-      tail.position.z = -0.23 - 0.22;
+      tail.position.z = zAt(1.0) - tLen / 2;
       root.add(tail);
 
       // Head block. A manta's head stands proud of the disc between the
@@ -119,15 +381,15 @@ export const ODD_PLANS = {
       const headMat = new THREE.MeshStandardMaterial({ color: 0x4d5f70, roughness: 0.7 });
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.085, 18, 14), headMat);
       head.scale.set(1.15, 0.62, 1.30);
-      head.position.set(0, -0.012, 0.175);
+      head.position.set(0, -0.012, zAt(0.13));
       root.add(head);
       // wide terminal mouth across the front of the head
       const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.020, 0.030),
         new THREE.MeshStandardMaterial({ color: 0x141a20, roughness: 1 }));
-      mouth.position.set(0, -0.022, 0.255);
+      mouth.position.set(0, -0.022, zAt(0.02));
       root.add(mouth);
       // eyes on the sides of that head block, clear of the disc
-      eyes(root, { r: 0.021, x: 0.104, y: 0.002, z: 0.185, iris: 0x3b4e5c });
+      eyes(root, { r: 0.021, x: 0.104, y: 0.002, z: zAt(0.11), iris: 0x3b4e5c });
     },
   },
 
@@ -1099,44 +1361,104 @@ function buildStarfish(species, variant = Math.random()) {
 //
 // Now every joint is an explicit point and each segment is a bone stretched
 // between two points. The pose is therefore exactly what the coordinates say.
+const _crabTexCache = new Map();
+
 function buildCrab(species, variant = Math.random()) {
   const root = new THREE.Group();
   const c = species.colors;
+  const m = species.morph || {};
   const tint = (variant - 0.5) * 0.08;
 
-  // ---- Palette taken from the reference: red speckled shell, cream limbs,
-  // and — the detail that makes a crab claw read as a crab claw — BLACK tips.
-  const shellMat = new THREE.MeshStandardMaterial({
-    map: makeSkinTexture((u, v) => {
-      const s2 = Math.sin(u * Math.PI * 2);
-      _c.set(0xb8341d).offsetHSL(tint * 0.3, 0, tint);
-      if (s2 < 0.1) _c.set(0xe8d9c2);                       // pale underside
-      else {
-        // dense white speckling over red, as on the shell in the photograph
-        const sp = mottle(v * 130, u * 58);
-        if (sp > 0.56) _c.lerp(new THREE.Color(0xf4e9d8), (sp - 0.56) * 1.9);
-        const grain = mottle(v * 320, u * 140);
-        if (grain > 0.80) _c.lerp(new THREE.Color(0xfbf4e8), 0.5);
-        // regional grooves dividing the carapace into lobes
-        const groove = Math.pow(Math.abs(Math.cos(v * Math.PI * 3.0)), 16)
-                     + Math.pow(Math.abs(Math.cos(u * Math.PI * 2 * 3)), 18) * 0.6;
-        _c.multiplyScalar(1 - Math.min(0.4, groove) * 0.5);
+  // Two very different crabs are built here. Carpilius maculatus is a smooth
+  // cream shell carrying nine to eleven big maroon blotches in 2-3-4 rows (the
+  // "seven-eleven crab"); Scylla serrata is dark green with polygonal marbling,
+  // nine teeth down each anterolateral margin, and its last leg pair flattened
+  // into swimming paddles.
+  const ground = new THREE.Color(c.body);
+  const blot = new THREE.Color(c.band ?? 0x8d2440);
+  const pale = new THREE.Color(c.belly ?? 0xe8d9c2);
+  const pattern = m.shellPattern ?? 'spots711';
+
+  // 9 blotches in 2-3-4 rows, as [lateral -1..1, along 0..1]
+  const SPOTS = [
+    [-0.35, 0.24], [0.35, 0.24],
+    [-0.56, 0.46], [0.00, 0.46], [0.56, 0.46],
+    [-0.64, 0.70], [-0.24, 0.70], [0.24, 0.70], [0.64, 0.70],
+  ];
+
+  const shellAt = (u, v) => {
+    const s2 = Math.sin(u * Math.PI * 2);
+    const lat = Math.cos(u * Math.PI * 2);
+    if (s2 < 0.1) { _c.copy(pale); return _c; }             // pale underside
+    if (pattern === 'marbled') {
+      const cell = spotField(u, v, 9, 2.7);
+      _c.copy(ground).offsetHSL(0, 0, (cell.id - 0.5) * 0.16);
+      // dark lines where cells meet == the polygonal marbling
+      _c.lerp(blot, (1 - ss(0.0, 0.16, cell.edge)) * 0.75);
+    } else {
+      _c.copy(ground);
+      for (const [sl, sv] of SPOTS) {
+        const d = Math.hypot(lat - sl, (v - sv) * 2.1);
+        if (d < 0.21) _c.lerp(blot, (1 - ss(0.13, 0.21, d)) * 0.95);
       }
-      if (v > 0.93) _c.lerp(new THREE.Color(0xefe2cc), (v - 0.93) * 8);
-      return [_c.r, _c.g, _c.b];
-    }, 640, 320),
-    bumpMap: makeBumpTexture((u, v) => {
-      const sp = mottle(v * 130, u * 58);
-      const g = Math.pow(Math.abs(Math.cos(v * Math.PI * 3.0)), 16);
-      return 0.55 + (sp - 0.5) * 0.22 - g * 0.3;
-    }, 448, 224),
-    bumpScale: 0.05, roughness: 0.42, metalness: 0.10,
+      const grain = mottle(v * 320, u * 140);
+      if (grain > 0.84) _c.offsetHSL(0, 0, 0.04);
+    }
+    // regional grooves dividing the carapace into lobes
+    const groove = Math.pow(Math.abs(Math.cos(v * Math.PI * 3.0)), 16)
+                 + Math.pow(Math.abs(Math.cos(u * Math.PI * 2 * 3)), 18) * 0.6;
+    _c.multiplyScalar(1 - Math.min(0.4, groove) * (m.grooveDepth ?? 0.5));
+    if (v > 0.93) _c.lerp(pale, (v - 0.93) * 8);
+    return _c;
+  };
+
+  // Every other builder caches its textures per species; this one did not, so
+  // each crab that spawned regenerated a 640x320 shell texture — 135 ms for a
+  // reef crab and 385 ms for a mud crab, on the spawn path. The textures are
+  // now built once per species and the per-individual colour variation is
+  // applied through the material tint instead, which costs nothing.
+  const limbCol = c.fin ?? 0xe0cdae;
+  let tex = _crabTexCache.get(species.id);
+  if (!tex) {
+    tex = {
+      shell: makeSkinTexture((u, v) => { const q = shellAt(u, v); return [q.r, q.g, q.b]; }, 640, 320),
+      bump: makeBumpTexture((u, v) => {
+        const g = Math.pow(Math.abs(Math.cos(v * Math.PI * 3.0)), 16);
+        let h = 0.55 - g * 0.3;
+        if (pattern === 'marbled') h += (1 - ss(0, 0.16, spotField(u, v, 9, 2.7).edge)) * 0.10;
+        else h += (mottle(v * 130, u * 58) - 0.5) * 0.10;
+        return h;
+      }, 448, 224),
+      limb: pattern === 'marbled' ? makeSkinTexture((u, v) => {
+        const cell = spotField(u, v, 7, 5.1);
+        _c.set(limbCol).offsetHSL(0, 0, (cell.id - 0.5) * 0.12);
+        _c.lerp(blot, (1 - ss(0.0, 0.18, cell.edge)) * 0.7);
+        return [_c.r, _c.g, _c.b];
+      }, 256, 256) : null,
+    };
+    _crabTexCache.set(species.id, tex);
+  }
+
+  // per-individual tint, applied to the shared texture rather than baked in
+  const tintCol = new THREE.Color(0xffffff).offsetHSL(tint * 0.3, 0, tint * 0.6);
+
+  const shellMat = new THREE.MeshStandardMaterial({
+    map: tex.shell, bumpMap: tex.bump, color: tintCol,
+    // Carpilius is famously glossy; Scylla is matt.
+    bumpScale: 0.05, roughness: m.gloss ?? 0.42, metalness: 0.10,
   });
-  const limbMat = new THREE.MeshStandardMaterial({ color: 0xe0cdae, roughness: 0.55 });
-  const bandMat = new THREE.MeshStandardMaterial({ color: 0x8f6742, roughness: 0.6 });
-  const handMat = new THREE.MeshStandardMaterial({ color: 0xf0e3cd, roughness: 0.45 });
-  const redMat  = new THREE.MeshStandardMaterial({ color: 0xc03d22, roughness: 0.5 });
-  const tipMat  = new THREE.MeshStandardMaterial({ color: 0x1b1512, roughness: 0.3, metalness: 0.2 });
+
+  const limbMat = tex.limb
+    ? new THREE.MeshStandardMaterial({ map: tex.limb, color: tintCol, roughness: 0.6 })
+    : new THREE.MeshStandardMaterial({ color: limbCol, roughness: 0.55 });
+  const bandMat = new THREE.MeshStandardMaterial(
+    { color: m.bandCol ?? 0x8f6742, roughness: 0.6 });
+  const handMat = new THREE.MeshStandardMaterial(
+    { color: m.handCol ?? 0xf0e3cd, roughness: 0.45 });
+  const redMat  = new THREE.MeshStandardMaterial(
+    { color: m.accentCol ?? 0xc03d22, roughness: 0.5 });
+  const tipMat  = new THREE.MeshStandardMaterial(
+    { color: m.tipCol ?? 0x1b1512, roughness: 0.3, metalness: 0.2 });
 
   // ---- Carapace: broad fan, clearly wider than long ----------------------
   const CARA = {
@@ -1157,17 +1479,29 @@ function buildCrab(species, variant = Math.random()) {
   }), shellMat);
   root.add(shell);
 
-  // toothed front-lateral margin
+  // Anterolateral margin. Scylla serrata carries nine even teeth down each
+  // side; Carpilius maculatus has a smooth margin and only a few small spines
+  // between the eyes, so its tooth count is zero.
+  const nTeeth = m.teeth ?? 0;
   for (const s of [-1, 1]) {
-    for (let i = 0; i < 5; i++) {
-      const t = 0.06 + i * 0.072;
+    for (let i = 0; i < nTeeth; i++) {
+      const t = 0.05 + i * (0.42 / Math.max(1, nTeeth - 1));
       const w = surfaceAt(CARA, t, 'w');
-      const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.020, 0.058, 5), redMat);
+      const tooth = new THREE.Mesh(
+        new THREE.ConeGeometry(0.016, m.toothLen ?? 0.050, 5), redMat);
       tooth.position.set(s * (w - 0.004), 0.010, 0.35 - t * 0.70);
       tooth.rotation.z = s * (Math.PI / 2 - 0.30);
       tooth.rotation.y = s * -0.45;
       root.add(tooth);
     }
+  }
+  // small spines on the front margin between the eyes
+  for (let i = 0; i < (m.frontSpines ?? 0); i++) {
+    const x = (i - (m.frontSpines - 1) / 2) * 0.048;
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.030, 5), redMat);
+    sp.position.set(x, 0.048, 0.352);
+    sp.rotation.x = Math.PI / 2 - 0.35;
+    root.add(sp);
   }
 
   // ---- Eyes in their orbital notches -------------------------------------
@@ -1217,6 +1551,15 @@ function buildCrab(species, variant = Math.random()) {
     const wrist = V(s * 0.075, 0.215, 0.290);        // carpus: in, up, forward
     bone(arm, V(0, 0, 0), elbow, 0.050, 0.044, redMat);
     bone(arm, elbow, wrist, 0.045, 0.042, redMat);
+    // Scylla serrata carries two spines on the carpus (wrist); Carpilius has none
+    for (let q = 0; q < (m.carpalSpines ?? 0); q++) {
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.052, 5), redMat);
+      sp.position.copy(wrist.clone().lerp(elbow, 0.10 + q * 0.20));
+      sp.position.y += 0.030;
+      sp.position.x += s * 0.018;
+      sp.quaternion.setFromUnitVectors(V(0, 1, 0), V(s * 0.5, 0.75, 0.42).normalize());
+      arm.add(sp);
+    }
 
     // propodus — the swollen white hand, aligned wrist -> finger base
     const fBase = V(s * 0.020, 0.360, 0.360);
@@ -1267,21 +1610,41 @@ function buildCrab(species, variant = Math.random()) {
       const k1 = V(s * 0.20, 0.075, spread * 0.55);
       const k2 = V(s * 0.40, -0.055, spread * 0.85);
       const foot = V(s * 0.50, -0.235, spread * 1.05);
+      const isPaddle = (m.paddle ?? false) && i === 3;
       bone(leg, V(0, 0, 0), k1, 0.030, 0.026, limbMat);
-      bone(leg, k1, k2, 0.026, 0.020, limbMat);
-      bone(leg, k2, foot, 0.020, 0.008, limbMat);
-      // banding, as on the legs in the photograph
-      for (const [a, b, t] of [[V(0,0,0), k1, 0.55], [k1, k2, 0.45], [k1, k2, 0.8]]) {
-        const band = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), bandMat);
-        band.position.copy(a.clone().lerp(b, t));
-        band.scale.set(1, 0.5, 1);
-        band.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
-        leg.add(band);
+      bone(leg, k1, k2, 0.026, isPaddle ? 0.024 : 0.020, limbMat);
+      if (isPaddle) {
+        // Last leg pair flattened into an oar — this is what lets a mud crab
+        // swim rather than only walk, and it is the fastest way to tell the
+        // species from a reef crab.
+        const dir = foot.clone().sub(k2).normalize();
+        const blade = new THREE.Mesh(new THREE.SphereGeometry(0.080, 14, 10), limbMat);
+        blade.position.copy(k2.clone().lerp(foot, 0.56));
+        blade.scale.set(0.22, 1.35, 0.92);
+        blade.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
+        leg.add(blade);
+        // the segment before it is flattened too, though less so
+        const prop = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 9), limbMat);
+        prop.position.copy(k1.clone().lerp(k2, 0.6));
+        prop.scale.set(0.34, 1.25, 0.9);
+        prop.quaternion.setFromUnitVectors(V(0, 1, 0), k2.clone().sub(k1).normalize());
+        leg.add(prop);
+      } else {
+        bone(leg, k2, foot, 0.020, 0.008, limbMat);
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.075, 6), tipMat);
+        claw.position.copy(foot.clone().lerp(k2, 0.1));
+        claw.quaternion.setFromUnitVectors(V(0, 1, 0), foot.clone().sub(k2).normalize());
+        leg.add(claw);
       }
-      const claw = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.075, 6), tipMat);
-      claw.position.copy(foot.clone().lerp(k2, 0.1));
-      claw.quaternion.setFromUnitVectors(V(0, 1, 0), foot.clone().sub(k2).normalize());
-      leg.add(claw);
+      if (m.legBands ?? true) {
+        for (const [a, b, t] of [[V(0,0,0), k1, 0.55], [k1, k2, 0.45], [k1, k2, 0.8]]) {
+          const band = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), bandMat);
+          band.position.copy(a.clone().lerp(b, t));
+          band.scale.set(1, 0.5, 1);
+          band.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
+          leg.add(band);
+        }
+      }
       root._legs.push({ mesh: leg, side: s, phase: i * 0.85, kind: 'leg' });
     }
   }
@@ -1304,12 +1667,19 @@ export function buildOddity(species, key, { variant, detail = 'med' } = {}) {
   const [segments, radial] = resFor(detail, 'odd');
   const root = new THREE.Group();
 
+  // Plans may author these directly or derive them per species.
+  const stations = typeof plan.stations === 'function'
+    ? plan.stations(species) : plan.stations;
+  const bodyLength = typeof plan.bodyLength === 'function'
+    ? plan.bodyLength(species) : plan.bodyLength;
+  const yScale = plan.yScaleFor ? plan.yScaleFor(species) : (plan.yScale || null);
+
   const geo = organicBody({
-    stations: plan.stations,
-    length: plan.bodyLength,
+    stations,
+    length: bodyLength,
     segments, radial,
-    groove: plan.groove ? (t, th) => plan.groove(t, th) : null,
-    yScale: plan.yScale || null,
+    groove: plan.groove ? (t, th) => plan.groove(t, th, species) : null,
+    yScale,
   });
 
   const ck = key + ':' + species.id;
@@ -1331,7 +1701,7 @@ export function buildOddity(species, key, { variant, detail = 'med' } = {}) {
   root._basePos = geo.attributes.position.array.slice();
   root._segments = segments;
   root._radial = radial;
-  root._bodyLength = plan.bodyLength;
+  root._bodyLength = bodyLength;
 
   plan.parts(root, species);
 

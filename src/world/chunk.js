@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
-import { floorHeightAt, biomeAt, blueHoleAt, BIOME_DEF } from './biomes.js';
+import { floorHeightAt, biomeAt, BIOME_DEF } from './biomes.js';
 import { SPECIES, speciesForBiome } from '../data/species.js';
 import { applyCaustics } from './waterShader.js';
 

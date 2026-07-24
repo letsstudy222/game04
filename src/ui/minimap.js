@@ -2,7 +2,6 @@
 // player and paints each biome its map color. The expensive sampling is cached
 // and only recomputed after you swim far enough; per-frame work is one blit + arrow.
 
-import { BIOME_DEF } from '../world/biomes.js';
 
 // Softer cartographic palette per biome (map look, not floor look).
 const MAP_COLORS = {

@@ -7,7 +7,7 @@ const KEY = 'abyssal-journal-v1';
 // Achievements — unlocked once, persisted, shown in the journal panel.
 export const ACHIEVEMENTS = {
   all_species: { viet: 'Nhà hải dương học', desc: 'Ghi nhận đủ mọi loài' },
-  all_biomes: { viet: 'Người vẽ hải đồ', desc: 'Đặt vây tới cả 5 vùng biển' },
+  all_biomes: { viet: 'Người vẽ hải đồ', desc: 'Đặt vây tới mọi vùng biển' },
   wreck: { viet: 'Thợ săn xác tàu', desc: 'Tìm thấy một con tàu đắm' },
   abyss: { viet: 'Chạm vực thẳm', desc: 'Lặn sâu quá 500 m' },
 };

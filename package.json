@@ -1,0 +1,13 @@
+{
+  "name": "abyssal",
+  "version": "1.0.0",
+  "description": "Game khám phá đại dương 3D bằng Three.js — không build step, deploy thẳng lên GitHub Pages",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "python3 tools/check-imports.py && node tools/build-all.mjs && node tools/verify-sharks.mjs && node tools/verify-rays.mjs && node tools/verify-reef.mjs && node tools/verify-crabs.mjs",
+    "serve": "npx http-server -p 8000"
+  },
+  "devDependencies": { "three": "0.160.0" },
+  "license": "MIT"
+}

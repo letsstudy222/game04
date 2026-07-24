@@ -45,8 +45,6 @@ const STATIONS = [
   { t: 1.00, w: 0.005, hTop: 0.009, hBot: 0.006, yOff: 0.000 },
 ];
 
-const PLEAT_COUNT = 30;
-
 // Carve creases and raise the rostrum ridge / splash guard.
 function grooveFn(t, th) {
   const s = Math.sin(th);
@@ -90,37 +88,6 @@ const BACK = new THREE.Color(0x53708a);
 const FLANK = new THREE.Color(0x7794a8);
 const BELLY = new THREE.Color(0xc3d0d6);
 const _c = new THREE.Color();
-
-function shadeFn(t, th, s) {
-  const up = (s + 1) * 0.5;                        // 0 belly .. 1 back
-  // two-stage countershade: back -> flank -> belly
-  if (up > 0.55) _c.copy(FLANK).lerp(BACK, smoothstep(0.55, 0.95, up));
-  else _c.copy(BELLY).lerp(FLANK, smoothstep(0.12, 0.55, up));
-
-  // Mottling — blue whales are named for their pale grey blotching.
-  const m = mottle(t * 26, th * 2.4);
-  const m2 = mottle(t * 61 + 5, th * 5.5);
-  const blotch = (m * 0.65 + m2 * 0.35 - 0.5);
-  _c.offsetHSL(0, -0.02, blotch * 0.085);
-
-  // Pleats read darker in the crease.
-  if (t > 0.04 && t < 0.48 && s < 0.3) {
-    const line = Math.pow(Math.abs(Math.cos(th * PLEAT_COUNT)), 10);
-    const fade = smoothstep(0.04, 0.11, t) * (1 - smoothstep(0.38, 0.48, t))
-               * (1 - smoothstep(-0.15, 0.3, s));
-    _c.multiplyScalar(1 - line * fade * 0.3);
-  }
-  // Dark mouth line.
-  if (t < 0.27) {
-    const lipAt = -0.12 - t * 0.5;
-    const d = Math.abs(s - lipAt);
-    const lip = Math.exp(-(d * d) / 0.0009) * (1 - smoothstep(0.2, 0.27, t));
-    _c.multiplyScalar(1 - lip * 0.55);
-  }
-  // Pale chin patch, as on the real animal.
-  if (t < 0.2 && s < -0.5) _c.lerp(BELLY, 0.35 * (1 - smoothstep(0.1, 0.2, t)));
-  return _c;
-}
 
 // Texture-space skin: this resolves 34 throat pleats crisply, which geometry
 // at any affordable vertex count cannot.

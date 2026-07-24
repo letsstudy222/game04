@@ -2,7 +2,6 @@
 // Two low-frequency noise fields (temperature, moisture-of-sorts) partition the
 // infinite plane into connected regions — like real oceans blend into each other.
 
-import { BIOMES } from '../data/species.js';
 
 // Visual + terrain identity for each biome.
 export const BIOME_DEF = {
@@ -279,4 +278,3 @@ export function floorHeightAt(noise, x, z) {
   return Math.min(minDepth, y);
 }
 
-export { BIOMES };

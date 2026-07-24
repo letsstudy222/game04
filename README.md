@@ -1,6 +1,6 @@
 # 🌊 ABYSSAL — Mô phỏng thế giới đại dương
 
-Game khám phá đại dương thư giãn, chạy thẳng trong trình duyệt bằng **Three.js**, không cần cài đặt hay build. Bơi tự do trong một thế giới **procedural vô hạn kiểu Minecraft** — vùng biển sinh ra theo mỗi cú bơi của bạn, các biome (rạn san hô, rừng tảo bẹ, biển khơi, vùng cực, biển sâu) nối liền mạch như đại dương thật. Chọn 1 trong 18 loài (tỉ lệ thật) và lặn xuống.
+Game khám phá đại dương thư giãn, chạy thẳng trong trình duyệt bằng **Three.js**, không cần cài đặt hay build. Bơi tự do trong một thế giới **procedural vô hạn kiểu Minecraft** — vùng biển sinh ra theo mỗi cú bơi của bạn, tám biome (rừng ngập mặn, bãi cỏ biển, hố xanh, rạn san hô, rừng tảo bẹ, vùng cực, biển khơi, biển sâu) nối liền mạch như đại dương thật. Chọn 1 trong 18 loài (tỉ lệ thật) và lặn xuống.
 
 Phong cách đồ họa: **low-poly mềm mại** (kiểu ABZÛ) — smooth shading + filmic tone mapping, nhẹ và mượt, cá dựng hoàn toàn bằng geometry thủ tục nên repo không cần file model nào.
 
@@ -88,13 +88,18 @@ src/
     chunkManager.js   # Streaming: load/unload chunk quanh người chơi, quản lý sinh vật, sway tảo
     ocean.js          # Bầu không khí: mặt nước, fog theo độ sâu, tia nắng, phù du
   entities/
-    fishMesh.js       # Dựng mesh cá/mập/voi/rùa low-poly + animation bơi
+    bodySurface.js    # Nền tảng: organicBody (mặt cong liền mạch), texture thủ tục, mắt, vây
+    fishMesh.js       # Điều phối: chọn builder theo `shape` của loài + định tuyến animation
+    whale.js          # Cá voi xanh
+    swimmers.js       # Cá mập, cá heo, cá heo chuột, cá ngừ, cá rạn — theo body plan có tham số
+    oddities.js       # Cá đuối, rùa, cá mặt trăng, mực, cá cần câu, rắn biển, sao biển, cua, dugong, cá ngựa, hải sâm
     creature.js       # AI sinh vật NPC: bơi lang thang + bơi theo đàn (boids)
     player.js         # Nhân vật điều khiển + camera góc thứ 3
   ui/
     menu.js           # Màn chọn loài (field-guide, thanh so sánh kích thước với thợ lặn)
     hud.js            # HUD: độ sâu, vùng biển, toạ độ, la bàn
   main.js             # Ghép tất cả + vòng lặp game
+tools/                # Kiểm tra hồi quy (không nằm trong bản deploy — xem tools/README.md)
 ```
 
 ---
@@ -164,19 +169,19 @@ Kết quả: **150 con từ 271 ms xuống 3,2 ms mỗi khung — nhanh gấp 86
 - **Ngụy trang phản bóng (countershading):** mọi loài đậm màu ở lưng, nhạt dần xuống bụng — bằng vertex color, không tốn texture.
 - **Thân dẹt hai bên đúng thật:** cá không có tiết diện tròn; cá hề rộng 5,5cm × cao 6,3cm.
 - **Cảm giác đồ sộ đã sửa:** trước đây camera lùi *tỉ lệ thuận* với kích thước loài nên **mọi loài đều chiếm 30–33% khung hình như nhau** — đó là lý do cá voi 28m trông chẳng khác cá nhỏ. Nay camera lùi theo `length^0.72`: cá voi **tràn 118% khung hình**, mực 89%, cá hề chỉ 6%. FOV cũng nới rộng theo tốc độ.
-- **Bách khoa toàn thư** (`E`): mục tra cứu cho cả 15 loài với **số liệu thật** — cân nặng, tuổi thọ, thức ăn, dải độ sâu, kỷ lục, và **trạng thái bảo tồn IUCN** có màu (Ít lo ngại → Cực kỳ nguy cấp). Mỗi loài có một đoạn viết về tập tính và sinh học. Loài chưa gặp bị khoá kèm gợi ý nơi tìm.
-- **12 loài chơi được**, trong đó 4 loài mới: **mực khổng lồ** (12 m, 8 tay + 2 xúc tu săn mồi, biển sâu), **cá mặt trăng** (thân đĩa khổng lồ, vây lưng và hậu môn chèo ngược nhau), **cá heo chuột vaquita** (loài thú biển hiếm nhất hành tinh — CR), **rắn biển vằn** (thân 14 đốt lượn sóng, đuôi bè như mái chèo).
+- **Bách khoa toàn thư** (`E`): mục tra cứu cho cả 18 loài chơi được với **số liệu thật** — cân nặng, tuổi thọ, thức ăn, dải độ sâu, kỷ lục, và **trạng thái bảo tồn IUCN** có màu (Ít lo ngại → Cực kỳ nguy cấp). Mỗi loài có một đoạn viết về tập tính và sinh học. Loài chưa gặp bị khoá kèm gợi ý nơi tìm.
+- **18 loài chơi được** trên tổng số 24 loài trong game (6 loài còn lại là sinh vật nền: đàn cá con, sao biển, cua đá, cua bùn, cá thòi lòi, hải sâm). Trong đó có **mực khổng lồ** (12 m, 8 tay + 2 xúc tu săn mồi, biển sâu), **cá mặt trăng** (thân đĩa khổng lồ, vây lưng và hậu môn chèo ngược nhau), **cá heo chuột vaquita** (loài thú biển hiếm nhất hành tinh — CR), **rắn biển vằn** (thân 14 đốt lượn sóng, đuôi bè như mái chèo).
 - **Chọn mật độ sinh vật** ngay trong menu: Thấp (70) / Vừa (150) / Cao (240 sinh vật cùng lúc).
 - **Điều khiển kiểu ABZÛ, chống chóng mặt:** chuột lái hướng bơi trực tiếp; camera bám theo có độ trễ mềm và **chỉ nghiêng 60% theo góc ngẩng** nên chân trời luôn ổn định; thân cá nghiêng nhẹ theo *tốc độ rẽ* rồi **tự cân bằng về 0**; góc ngẩng giới hạn ±60°; camera không bao giờ xoay nghiêng. Thêm **chỉ báo chân trời** trong HUD.
 - **Sinh vật nhỏ làm biển sống động:** đàn cá con rạn san hô (14–26 con lơ lửng trên nhánh san hô), **sao biển** và **cua đá** bò sát đáy biển (benthic — bám nền, không bơi lơ lửng).
 - **Địa hình mốc:** **cột đá** cao 22–52 m vươn lên từ đáy (~12% chunk) và **vòm đá** bơi xuyên qua được (~8% chunk) — dùng làm mốc định hướng khi khám phá.
-- **Minimap thế giới** góc trên phải: bản đồ màu các vùng biển xung quanh (san hô vàng cát, tảo bẹ xanh lục, biển khơi xanh dương, vùng cực xám băng, biển sâu tối), mũi tên phát sáng chỉ hướng bạn đang bơi, hướng Bắc luôn ở trên.
+- **Minimap thế giới** góc trên phải: bản đồ màu cả tám vùng biển xung quanh (san hô vàng cát, tảo bẹ xanh lục, biển khơi xanh dương, vùng cực xám băng, biển sâu tối, ngập mặn nâu tanin, cỏ biển lục nhạt, hố xanh lam thẫm), mũi tên phát sáng chỉ hướng bạn đang bơi, hướng Bắc luôn ở trên.
 - **Hình ảnh mềm mại:** smooth shading toàn bộ (địa hình, sinh vật, san hô), ACES filmic tone mapping cho màu chuyển êm như phim, ánh sáng môi trường dày hơn để bóng đổ dịu.
 - **Đại dương phản ứng với bạn:** chơi cá mập trắng → cá nhỏ và cả đàn cá dạt ra bỏ chạy (tăng tốc gấp đôi); bơi loài hiền lành → cá heo tò mò lượn theo bạn. Cá voi điềm nhiên không quan tâm, cá cần câu rình mồi đứng im.
 - **Chia sẻ thế giới bằng seed:** đổi seed trong menu hoặc mở link `?seed=tên-bất-kỳ` — cùng seed là cùng một đại dương, gửi link cho bạn bè để khám phá chung bản đồ.
-- **4 danh hiệu:** Nhà hải dương học (đủ mọi loài), Người vẽ hải đồ (đủ 5 vùng), Thợ săn xác tàu, Chạm vực thẳm (sâu quá 500 m) — lưu vĩnh viễn, xem trong Nhật ký (`J`).
+- **4 danh hiệu:** Nhà hải dương học (đủ mọi loài), Người vẽ hải đồ (đủ mọi vùng biển), Thợ săn xác tàu, Chạm vực thẳm (sâu quá 500 m) — lưu vĩnh viễn, xem trong Nhật ký (`J`).
 - **Nhật ký thám hiểm** (`J`): bơi gần một loài lần đầu → ghi nhận kèm thông báo; vào vùng biển mới → đánh dấu khám phá. Tiến độ **tự lưu qua các lần chơi** (localStorage). Loài chưa gặp hiện "???" kèm gợi ý vùng cần tìm; thẻ menu có dấu ✓ với loài đã gặp.
-- **8 loài tỉ lệ thật:** cá hề, rùa biển, cá ngừ, cá mập trắng, cá heo, cá đuối manta, cá voi xanh — và **cá cần câu biển sâu** với chiếc lure phát sáng, loài duy nhất sống ở tầng nửa đêm.
+- **Mọi loài đều dựng theo tỉ lệ thật** (FishBase/IUCN/NOAA), từ cá hề 9 cm tới cá voi xanh 28 m — kể cả **cá cần câu biển sâu** với chiếc lure phát sáng, loài duy nhất sống ở tầng nửa đêm.
 - **Chu kỳ ngày/đêm** (6 phút/vòng): ánh sáng, màu nước và tia nắng đổi dần từ trưa rực rỡ đến đêm thăm thẳm — ban đêm sứa và cá cần câu phát sáng nổi bật.
 - **Chế độ chụp ảnh** (`P`): ẩn toàn bộ UI, camera từ từ quay quanh con cá của bạn.
 - **Xác tàu đắm** hiếm gặp (~6% chunk biển khơi/biển sâu) — nghiêng mình trên đáy, cột buồm gãy, chờ được khám phá.
@@ -189,7 +194,7 @@ Kết quả: **150 con từ 271 ms xuống 3,2 ms mỗi khung — nhanh gấp 86
 ## ⚠️ Ghi chú kỹ thuật
 - Không có bước build. Three.js nạp qua **import map** từ CDN jsDelivr (phiên bản `0.160.0`).
 - Thế giới **có seed** (`config.js → seed`): cùng seed → cùng bản đồ. Đổi seed để có đại dương khác.
-- Cá được dựng bằng geometry thủ tục (LatheGeometry + các vây tam giác) nên **không cần asset ngoài**.
+- Sinh vật được dựng bằng geometry thủ tục nên **không cần asset ngoài**. Mỗi loài là một mặt cong liền mạch (`entities/bodySurface.js → organicBody`) có tiết diện biến đổi dọc thân; chi tiết da sinh thẳng vào texture thủ tục. Cách dựng bằng `LatheGeometry` trước đây đã bị thay thế và gỡ bỏ.
 
 ## 📄 License
 MIT — dùng tự do cho mục đích cá nhân & thương mại.
