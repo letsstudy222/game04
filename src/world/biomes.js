@@ -6,12 +6,17 @@
 // Visual + terrain identity for each biome.
 import { biomeIdAt, biomeWeightsAt, worldAt, WORLD_W } from './earth.js';
 
+// WATER TINTS. These were 62-80% saturated, which is poster paint, not sea.
+// Scattering mixes wavelengths on the way to the eye, so real water is far less
+// pure than its absorption spectrum suggests — the ocean is only vividly blue
+// in a photograph taken through a polariser. Saturation is now roughly 55% of
+// what it was, with each biome's hue and relative lightness kept intact.
 export const BIOME_DEF = {
   coral_reef: {
     label: 'Rạn san hô',
     floorColor: 0xf0dcae,       // pale sand
     accentColor: 0xff6f61,       // coral pink/orange
-    waterTint: 0x2fb6c9,
+    waterTint: 0x59a3ae,
     baseDepth: -14,              // shallow
     depthAmp: 22,                // gentle relief
     decor: 'coral',
@@ -22,7 +27,7 @@ export const BIOME_DEF = {
     label: 'Rừng tảo bẹ',
     floorColor: 0x5b6b4a,
     accentColor: 0x6f8f3a,
-    waterTint: 0x2b7a63,
+    waterTint: 0x406e61,
     baseDepth: -30,
     depthAmp: 34,
     decor: 'kelp',
@@ -33,7 +38,7 @@ export const BIOME_DEF = {
     label: 'Biển khơi',
     floorColor: 0x3a5a72,
     accentColor: 0x4a7fa0,
-    waterTint: 0x1f6f9a,
+    waterTint: 0x3e6d86,
     baseDepth: -120,
     depthAmp: 90,
     decor: 'sparse_rock',
@@ -44,7 +49,7 @@ export const BIOME_DEF = {
     label: 'Vùng cực',
     floorColor: 0x8fa6b2,
     accentColor: 0xcfe6f2,
-    waterTint: 0x4f8ba8,
+    waterTint: 0x6a8b9c,
     baseDepth: -80,
     depthAmp: 60,
     decor: 'ice',
@@ -55,7 +60,7 @@ export const BIOME_DEF = {
     label: 'Rừng ngập mặn',
     floorColor: 0x4a3d2a,          // soft anoxic mud
     accentColor: 0x6b5333,
-    waterTint: 0x4a5230,           // tannin-stained, turbid
+    waterTint: 0x4a4f3b,           // tannin-stained, turbid
     baseDepth: -3,                 // intertidal; almost no water column
     depthAmp: 5,
     decor: 'mangrove',
@@ -66,7 +71,7 @@ export const BIOME_DEF = {
     label: 'Hố xanh',
     floorColor: 0xa89a80,          // pale carbonate sand on the rim
     accentColor: 0xd8cdb4,
-    waterTint: 0x1246a0,           // the deep blue that names them
+    waterTint: 0x355388,           // the deep blue that names them
     baseDepth: -14,                // shallow rim; the shaft is carved below
     depthAmp: 10,
     decor: 'karst',
@@ -77,7 +82,7 @@ export const BIOME_DEF = {
     label: 'Bãi cỏ biển',
     floorColor: 0xcbbf94,          // clean sand
     accentColor: 0x5f8f3f,
-    waterTint: 0x35a8b4,
+    waterTint: 0x569aa1,
     baseDepth: -7,
     depthAmp: 7,
     decor: 'seagrass',
@@ -88,7 +93,7 @@ export const BIOME_DEF = {
     label: 'Biển sâu',
     floorColor: 0x1a2733,
     accentColor: 0x2a3d4d,
-    waterTint: 0x081821,
+    waterTint: 0x0e181d,
     baseDepth: -300,
     depthAmp: 165,
     decor: 'vent',

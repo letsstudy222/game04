@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { BIOME_DEF } from './biomes.js';
-import { makeWaterSurface, CAUSTIC, depthAbsorption } from './waterShader.js';
+import { makeWaterSurface, makeWaterDome, CAUSTIC, depthAbsorption } from './waterShader.js';
 
 function lerpColor(a, b, t) {
   return a.clone().lerp(b, THREE.MathUtils.clamp(t, 0, 1));
@@ -29,7 +29,14 @@ export class Ocean {
   _buildSurface() {
     // Gerstner-wave surface with a refracted sun (Snell's window) when seen
     // from below. See world/waterShader.js.
-    const { mesh, uniforms } = makeWaterSurface(2000, 256);
+    // The gradient dome sits behind everything and replaces the flat
+    // scene.background; see makeWaterDome for why a single colour was wrong.
+    const dome = makeWaterDome(900);
+    this.dome = dome.mesh;
+    this.domeUniforms = dome.uniforms;
+    scene.add(this.dome);
+
+    const { mesh, uniforms } = makeWaterSurface(700, 160);
     this.surface = mesh;
     this.surfaceUniforms = uniforms;
     this.surface.position.y = CONFIG.world.surfaceY;
@@ -109,13 +116,42 @@ export class Ocean {
     tint.multiplyScalar(0.22 + 0.78 * daylight);       // night darkens the water
     this._currentTint.lerp(tint, 0.05);
 
+    // VISIBILITY. This used to reach 736 m in a reef and 960 m in a blue hole.
+    // The clearest tropical water on Earth gives 30-60 m horizontally; at 736 m
+    // the sea stops behaving like a volume at all and distant terrain reads as
+    // dark silhouettes hanging in tinted air, which is exactly how the water
+    // was coming out looking wrong.
+    //
+    // Going to a true 40 m would leave the player swimming in a small bubble,
+    // so this settles at roughly three times reality: far enough to see where
+    // you are going, close enough that the water hides things and depth reads
+    // as depth.
     const clarity = def.clarity || 1;
-    const near = 18 + (1 - depth01) * 12;
-    const far = (120 + (1 - depth01) * 520) * clarity;
+    const near = 6 + (1 - depth01) * 6;
+    const far = (34 + (1 - depth01) * 116) * clarity;
     this.scene.fog.color.copy(this._currentTint);
     this.scene.fog.near = near;
     this.scene.fog.far = far;
     this.scene.background.copy(this._currentTint);
+
+    // Dome follows the camera and takes its horizon band straight from the fog
+    // colour, so geometry dissolving into the distance meets the empty water at
+    // exactly the same value and there is no seam.
+    this.dome.position.copy(playerPos);
+    const du = this.domeUniforms;
+    du.uMid.value.copy(this._currentTint);
+    // Looking up: towards the surface and the light. Strongest in the shallows,
+    // gone by the time the surface is out of reach.
+    const upLift = (1 - depth01) * daylight;
+    du.uUp.value.copy(this._currentTint)
+      .lerp(new THREE.Color(def.waterTint), 0.35)
+      .lerp(new THREE.Color(0xdcf4ff), 0.30 * upLift)
+      .multiplyScalar(0.75 + 0.55 * upLift);
+    // Looking down: into water the light has not reached.
+    du.uDown.value.copy(this._currentTint)
+      .lerp(this.deepColor, 0.75)
+      .multiplyScalar(0.30 + 0.25 * daylight);
+    du.uCamY.value = playerPos.y;
 
     // --- Surface: the shader does the wave maths on the GPU ---
     const u = this.surfaceUniforms;
@@ -130,7 +166,10 @@ export class Ocean {
     // --- Caustics: same clock as the waves, faded by daylight ---
     CAUSTIC.time.value = time;
     CAUSTIC.daylight.value = daylight;
-    CAUSTIC.strength.value = (def.clarity || 1) * 1.05;
+    // The caustic net is evaluated per fragment across the seabed, which fills
+    // most of the screen in a 3 m seagrass meadow. It is the single most
+    // expensive thing a shallow biome does, so the quality tier scales it.
+    CAUSTIC.strength.value = (def.clarity || 1) * 1.05 * (CONFIG.perf.causticStrength ?? 1);
 
     // --- God rays follow surface, gently sway ---
     this.rays.position.set(playerPos.x, 0, playerPos.z);

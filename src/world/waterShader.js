@@ -28,11 +28,12 @@ vec3 gerstner(vec2 p, vec2 dir, float steep, float wl, float t, float speed) {
 
 /* ------------------------------------------------------- water surface */
 
-export function makeWaterSurface(size = 2000, segs = 256) {
-  // SIZE. The old surface was 6000 m across while fog swallows everything past
-  // roughly 640 m — 95% of its triangles were never seen. Shrinking it to 2400
-  // buys far more resolution for a modest cost. The widest fog reach is 736 m
-  // in the clearest biome, so a 1000 m half-width still never shows an edge.
+export function makeWaterSurface(size = 700, segs = 160) {
+  // SIZE. Once underwater visibility was brought down from 736 m to a realistic
+  // 173 m, most of this plane became unreachable. The furthest any biome now
+  // sees is 225 m, so a 350 m half-width still never shows an edge — and the
+  // triangles saved buy resolution instead: 4.4 m per quad against 30 m
+  // originally, which is what finally makes the smaller wave trains exist.
   //
   // RESOLUTION. At 30 m per quad only the 62 m swell was above Nyquist; the
   // 31, 15 and 7 m trains were finer than the mesh could represent and simply
@@ -111,9 +112,14 @@ export function makeWaterSurface(size = 2000, segs = 256) {
       varying float vCrest;
       varying float vFold;
 
+      // Integer-style hash rather than the usual fract(sin(...)). The sine
+      // version costs two transcendentals per sample and this shader takes a
+      // dozen samples per pixel over most of the screen; that alone was a large
+      // part of why the frame rate sat at 26.
       vec2 hash22(vec2 p) {
-        p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-        return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+        vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+        p3 += dot(p3, p3.yzx + 33.33);
+        return fract((p3.xx + p3.yz) * p3.zy) * 2.0 - 1.0;
       }
       float gnoise(vec2 p) {
         vec2 i = floor(p), f = fract(p);
@@ -127,10 +133,11 @@ export function makeWaterSurface(size = 2000, segs = 256) {
       // Ripples below the mesh resolution, as a normal only. Real water carries
       // centimetre-scale chop that never displaces anything visibly but is
       // entirely responsible for how it glitters.
-      vec3 rippleNormal(vec2 p, float t) {
-        float h = 0.0, amp = 1.0, frq = 0.35;
+      vec3 rippleNormal(vec2 p, float t, float detail) {
+        float amp = 1.0, frq = 0.35;
         vec2 dr = vec2(0.0);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 2; i++) {
+          if (float(i) > detail) break;
           vec2 q = p * frq + vec2(t * (0.6 + float(i) * 0.35), t * 0.25);
           float e = 0.6 / frq;
           float c = gnoise(q);
@@ -138,7 +145,7 @@ export function makeWaterSurface(size = 2000, segs = 256) {
           dr.y += (gnoise(q + vec2(0.0, e * frq)) - c) * amp;
           amp *= 0.55; frq *= 2.7;
         }
-        return normalize(vec3(-dr.x * 2.6, 1.0, -dr.y * 2.6));
+        return normalize(vec3(-dr.x * 3.1, 1.0, -dr.y * 3.1));
       }
 
       void main() {
@@ -146,10 +153,15 @@ export function makeWaterSurface(size = 2000, segs = 256) {
         vec3 n = normalize(vNormal);
 
         // Blend the ripple normal into the wave normal in the wave's own frame.
-        vec3 rn = rippleNormal(vWorld.xz, uTime);
+        // Ripples are sub-metre detail. Past about eighty metres they are far
+        // below a pixel, so the octaves are dropped with distance instead of
+        // being computed and then averaged away.
+        float dist = length(cameraPosition - vWorld);
+        float detail = clamp(2.0 - dist / 45.0, 0.0, 2.0);
+        vec3 rn = rippleNormal(vWorld.xz, uTime, detail);
         vec3 t1 = normalize(cross(vec3(0.0, 1.0, 0.0), n) + vec3(0.001));
         vec3 t2 = cross(n, t1);
-        n = normalize(n + (t1 * rn.x + t2 * rn.z) * 0.75 * uWind);
+        n = normalize(n + (t1 * rn.x + t2 * rn.z) * 0.75 * uWind * step(0.01, detail));
 
         bool below = uCamY < 0.0;
         if (below) n = -n;
@@ -238,6 +250,60 @@ export function makeWaterSurface(size = 2000, segs = 256) {
 
   const mesh = new THREE.Mesh(geo, material);
   mesh.renderOrder = 2;
+  return { mesh, uniforms };
+}
+
+
+/* ------------------------------------------------------- water column dome */
+
+/**
+ * The water you are looking THROUGH, as a vertical gradient.
+ *
+ * `scene.background` is a single colour, so every direction that had no
+ * geometry in it came out identical — measured on a real frame, the top of the
+ * screen varied by 0.8 of one colour step out of 255. That flatness is the main
+ * reason the sea read as a tinted pane rather than as a volume you are inside.
+ *
+ * Real water is not uniform: light comes from above, so looking up is bright
+ * and looking down falls away into the dark. The dome carries that gradient,
+ * with the horizon band matched to the fog colour so geometry fading into the
+ * distance lands on exactly the same colour the empty water already is.
+ */
+export function makeWaterDome(radius = 900) {
+  const uniforms = {
+    uUp: { value: new THREE.Color(0x8fd4e0) },
+    uMid: { value: new THREE.Color(0x2f7f92) },
+    uDown: { value: new THREE.Color(0x061a24) },
+    uCamY: { value: -10 },
+  };
+  const material = new THREE.ShaderMaterial({
+    uniforms,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 uUp, uMid, uDown;
+      varying vec3 vDir;
+      void main() {
+        float y = clamp(vDir.y, -1.0, 1.0);
+        // The band around the horizon is deliberately wide and soft. A tight
+        // gradient reads as a painted backdrop; light in water scatters over
+        // tens of metres and the transition is gradual.
+        vec3 c = y > 0.0
+          ? mix(uMid, uUp, pow(y, 0.65))
+          : mix(uMid, uDown, pow(-y, 0.80));
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), material);
+  mesh.renderOrder = -1;          // behind everything
+  mesh.frustumCulled = false;
   return { mesh, uniforms };
 }
 

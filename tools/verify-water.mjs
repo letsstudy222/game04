@@ -153,9 +153,40 @@ console.log(`\n  Luoi ${size} m / ${segs} = ${q.toFixed(2)} m moi o`);
 console.log(`    song phan giai duoc bang hinh hoc: ${geoTrains.join(', ')} m`);
 console.log(`    song min hon -> rippleNormal o fragment (khong the alias)`);
 if (geoTrains.length < 3) { console.log('    LOI: qua it song hien duoc'); fail++; }
-// tam nhin xa nhat trong game la 736 m (bien trong nhat)
-if (size / 2 < 736) { console.log(`    LOI: nua chieu rong ${size / 2} m < tam nhin 736 m, se thay mep`); fail++; }
-else console.log(`    nua chieu rong ${size / 2} m > tam nhin xa nhat 736 m: khong lo mep`);
+// tam nhin xa duoc doc tu ocean.js o buoc 4, khong hardcode nua
 
 console.log(`\n  Tam giac mat nuoc: ${(segs * segs * 2).toLocaleString()}`);
+
+/* ---- 4. do chuyen mau doc va bao hoa ------------------------------------ */
+const bio = fs.readFileSync('../src/world/biomes.js', 'utf8');
+const tints = [...bio.matchAll(/waterTint: 0x([0-9a-f]{6})/g)].map((m) => parseInt(m[1], 16));
+// Bao hoa mot minh khong du: xanh tham cua ho xanh co bao hoa cao ma khong he
+// choi, trong khi cyan SANG moi la thu lam nuoc trong nhu son ap phich. Do
+// "do choi" = bao hoa x do sang moi phan biet duoc hai truong hop nay.
+const chroma = (h) => {
+  const r = (h >> 16 & 255) / 255, g = (h >> 8 & 255) / 255, b = (h & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  return (mx ? (mx - mn) / mx : 0) * mx;
+};
+const cs = tints.map(chroma);
+const worst = Math.max(...cs);
+console.log(`\n  Do choi cua mau nuoc (bao hoa x do sang):`);
+console.log(`    trung binh ${(cs.reduce((a, b) => a + b, 0) / cs.length * 100).toFixed(0)}%, cao nhat ${(worst * 100).toFixed(0)}%`);
+console.log('    (truoc khi sua: cao nhat 61% — cyan ran san ho 0x2fb6c9)');
+if (worst > 0.42) { console.log('    -> con mau qua gat'); fail++; }
+
+const oc = fs.readFileSync('../src/world/ocean.js', 'utf8');
+const hasDome = oc.includes('makeWaterDome') && oc.includes('du.uUp.value');
+console.log(`  Vom chuyen mau doc: ${hasDome ? 'co' : 'THIEU'}`);
+if (!hasDome) fail++;
+const fogM = oc.match(/const far = \((\d+) \+ \(1 - depth01\) \* (\d+)\) \* clarity/);
+if (fogM) {
+  const maxFar = (+fogM[1] + +fogM[2]) * 1.5;   // clarity cao nhat la 1.5 (ho xanh)
+  console.log(`  Tam nhin xa nhat: ${maxFar.toFixed(0)} m  (nuoc that trong nhat: 30-60 m)`);
+  if (maxFar > 320) { console.log('    -> nuoc khong con che duoc gi, trong nhu khong khi nhuom mau'); fail++; }
+  const half = size / 2;
+  console.log(`  Nua chieu rong mat nuoc ${half} m vs tam nhin ${maxFar.toFixed(0)} m: ${half > maxFar ? 'khong lo mep' : 'CO THE LO MEP'}`);
+  if (half <= maxFar) fail++;
+}
+
 process.exit(fail ? 1 : 0);

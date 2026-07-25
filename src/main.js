@@ -1,7 +1,7 @@
 // main.js — Bootstraps the whole game and runs the loop.
 
 import * as THREE from 'three';
-import { CONFIG, applyDensity } from './config.js';
+import { CONFIG, applyDensity, QUALITY_TIERS } from './config.js';
 import { Input } from './core/input.js';
 import { OceanAudio } from './core/audio.js';
 import { Ocean } from './world/ocean.js';
@@ -41,8 +41,12 @@ const hintEl = document.getElementById('hint');
 const loadingEl = document.getElementById('loading');
 
 // --- renderer / scene / camera ---
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// MSAA and a HiDPI backbuffer are the same tool bought twice. On a 2x display
+// the backbuffer is already supersampling; paying for MSAA on top of it is
+// what put an integrated GPU into the 20-30 FPS band on an empty seabed.
+const _dpr = window.devicePixelRatio || 1;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: _dpr < 1.5 });
+renderer.setPixelRatio(Math.min(_dpr, CONFIG.perf.pixelRatioCap));
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Filmic tone mapping: rolls highlights off gently -> much softer look
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -282,9 +286,31 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// --- adaptive quality: step down if the machine can't hold framerate ---
-let fpsN = 0, fpsT = 0, qualityTier = 2;
+// --- adaptive quality: steps DOWN when the machine struggles and back UP when
+// it recovers. The previous version only ever stepped down and never restored,
+// so a single half-second stall — a chunk build, an alt-tab, a garbage
+// collection — permanently locked the session into the lowest tier. Players
+// then judged the game on graphics it was never meant to ship with.
+let fpsN = 0, fpsT = 0;
+let tierIndex = 0;                       // 0 = highest, see QUALITY_TIERS
+let tierCooldown = 0;                    // seconds before another change
 let shownFps = 60, statsT = 0;
+
+function applyTier(i) {
+  const t = QUALITY_TIERS[Math.max(0, Math.min(QUALITY_TIERS.length - 1, i))];
+  tierIndex = QUALITY_TIERS.indexOf(t);
+  const cap = t.pixelRatio === null ? CONFIG.perf.pixelRatioCap : t.pixelRatio;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  CONFIG.perf.maxCreatures = t.maxCreatures;
+  CONFIG.perf.fullDetailCreatures = t.fullDetail;
+  CONFIG.perf.causticStrength = t.caustics;
+  if (CONFIG.chunk.renderRadius !== t.renderRadius) {
+    CONFIG.chunk.renderRadius = t.renderRadius;
+    chunks._lastChunk = null;            // force the ring to rebuild
+  }
+  tierCooldown = 4;                      // let the change settle before judging
+}
 
 function drawStats(dt, pos) {
   statsT += dt;
@@ -298,31 +324,41 @@ function drawStats(dt, pos) {
     <div>Lệnh vẽ <b>${info.render.calls}</b></div>
     <div>Sinh vật <b>${chunks.liveCreatures ?? 0}</b></div>
     <div>Chunk <b>${chunks.loaded.size}</b></div>
-    <div>Chi tiết đầy đủ <b>${CONFIG.perf.fullDetailCreatures}</b></div>`;
+    <div>Chi tiết đầy đủ <b>${CONFIG.perf.fullDetailCreatures}</b></div>
+    <div>Chất lượng <b>${QUALITY_TIERS[tierIndex].name}</b></div>`;
 }
 function adaptQuality(dt) {
   fpsN++; fpsT += dt;
-  if (fpsT < 0.5) return;
-  const fps = fpsN / fpsT;
-  shownFps = fps;
+  if (tierCooldown > 0) tierCooldown -= dt;
+  if (fpsT < 1.0) return;                         // a full second, not half:
+  const fps = fpsN / fpsT;                        // half a second is short
+  shownFps = fps;                                 // enough to be one hitch
   fpsN = 0; fpsT = 0;
-  if (fps < 38 && qualityTier === 2) {
-    qualityTier = 1;
-    renderer.setPixelRatio(1);                    // cheapest big win
-  } else if (fps < 30 && qualityTier === 1) {
-    qualityTier = 0;
-    CONFIG.chunk.renderRadius = Math.min(CONFIG.chunk.renderRadius, 2);
-    CONFIG.perf.maxCreatures = Math.min(CONFIG.perf.maxCreatures, 80);
-    chunks._lastChunk = null;                     // force ring rebuild
-  }
+  if (tierCooldown > 0) return;
+
+  // Wide dead band between the two thresholds. Stepping down at 34 and up at
+  // 55 means a machine sitting at 45 FPS stays where it is instead of
+  // oscillating between tiers every few seconds, which reads as flickering.
+  if (fps < 34 && tierIndex < QUALITY_TIERS.length - 1) applyTier(tierIndex + 1);
+  else if (fps > 55 && tierIndex > 0) applyTier(tierIndex - 1);
 }
 
-// --- day/night cycle (full cycle = 6 minutes, starts at noon) ---
-const DAY_LENGTH = 360; // seconds
+// --- day/night cycle ---
+// A raw cosine day has a mean of 0.5, and ocean.js multiplies the water tint
+// by (0.22 + 0.78 * daylight). At the old six-minute cycle that meant the
+// average frame rendered the sea at 61% of its intended colour and the player
+// saw the light the art was tuned for for about thirty seconds out of every
+// six minutes. Two changes: a much longer cycle, and a bias curve that spends
+// most of it in usable light. Night still happens — it is just an event you
+// swim into rather than the default state of the world.
 function daylightAt(t) {
-  // 1 at noon -> 0 at midnight, smooth cosine
-  const phase = (t / DAY_LENGTH) * Math.PI * 2;
-  return THREE.MathUtils.clamp(0.5 + 0.5 * Math.cos(phase), 0.04, 1);
+  const { dayLength, dayBias, nightFloor, startPhase } = CONFIG.time;
+  const phase = ((t / dayLength) + startPhase) * Math.PI * 2;
+  const raw = 0.5 + 0.5 * Math.cos(phase);          // 0..1, cosine day
+  // pow with an exponent < 1 lifts the middle of the curve without touching
+  // either end: noon stays 1, midnight stays 0, dusk stops being a brownout.
+  const shaped = Math.pow(raw, 1 - THREE.MathUtils.clamp(dayBias, 0, 0.9));
+  return THREE.MathUtils.clamp(shaped, nightFloor, 1);
 }
 
 // --- photo mode: orbiting camera, UI hidden ---
