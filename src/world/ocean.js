@@ -34,7 +34,10 @@ export class Ocean {
     const dome = makeWaterDome(900);
     this.dome = dome.mesh;
     this.domeUniforms = dome.uniforms;
-    scene.add(this.dome);
+    // this.scene, not scene: the constructor parameter does not reach a
+    // method. This threw a ReferenceError on every boot, which killed the
+    // Ocean constructor, which killed main.js before the menu was populated.
+    this.scene.add(this.dome);
 
     const { mesh, uniforms } = makeWaterSurface(700, 160);
     this.surface = mesh;
