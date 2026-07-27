@@ -9,7 +9,7 @@
     "serve": "npx http-server -p 8000"
   },
   "devDependencies": {
-    "three": "^0.160.1"
+    "three": "^0.160.0"
   },
   "license": "MIT"
 }

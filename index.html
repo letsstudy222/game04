@@ -9,6 +9,51 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
   <!-- No build step: Three.js loaded via import map from CDN -->
+  <!-- Boot diagnostics. The menu markup is static and #loading has no hidden
+       class, so ANY failure before main.js finishes leaves exactly the same
+       screen: a menu with no species cards and a spinner that never stops.
+       That single screen has at least three unrelated causes, so rather than
+       guess, report. Remove this block once the game boots reliably. -->
+  <script>
+    (function () {
+      var box = null;
+      function report(kind, msg, extra) {
+        if (!box) {
+          box = document.createElement('div');
+          box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;' +
+            'max-height:45vh;overflow:auto;background:#2a0d12;color:#ffd7de;' +
+            'font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:12px 16px;' +
+            'border-top:2px solid #ff5470;white-space:pre-wrap';
+          (document.body || document.documentElement).appendChild(box);
+        }
+        box.textContent += '[' + kind + '] ' + msg + (extra ? '\n    ' + extra : '') + '\n';
+      }
+      // capture:true is required — resource load failures (a CDN that will not
+      // answer) do not bubble, so a normal error handler never sees them.
+      window.addEventListener('error', function (e) {
+        if (e.target && e.target !== window && e.target.src) {
+          report('KHONG TAI DUOC', e.target.src);
+        } else {
+          report('LOI JS', e.message, (e.filename || '') + ':' + (e.lineno || '?'));
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        report('PROMISE', (e.reason && (e.reason.stack || e.reason.message)) || String(e.reason));
+      });
+      // Watchdog: if nothing threw but the cards never appeared, the modules
+      // never ran at all — almost always file:// or a blocked CDN.
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var cards = document.getElementById('menu-cards');
+          if (cards && cards.children.length === 0 && !box) {
+            report('KHONG CHAY', 'Module khong thuc thi. Giao thuc: ' +
+              location.protocol + ' — can chay qua http (npm run serve), khong mo bang file://');
+          }
+        }, 9000);
+      });
+    })();
+  </script>
+
   <script type="importmap">
     {
       "imports": {
