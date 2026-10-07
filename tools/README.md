@@ -144,3 +144,30 @@ cho **cả 18 loài chơi được**, không cần trình duyệt. Lỗi trên b
 của loài đầu tiên.
 
 Cả hai chạy **đầu tiên** trong `npm run check`, trước mọi kiểm tra hình học.
+
+
+## Điều khiển bơi và camera
+
+`npm run check:movement` kiểm tra 9 nhóm hành vi: cùng quãng đường/góc rẽ/độ nghiêng
+ở 15, 30, 60, 120 và 144 FPS; quán tính khi thả phím; phanh rồi lùi; giới hạn tốc độ
+khi bơi chéo; phím đối nghịch; hướng thân khi ngẩng; tránh đáy dốc; giới hạn mặt
+nước/đáy; bờ biển, zoom và các chế độ camera. Bộ này cũng nằm trong `npm run check`.
+
+Thiết kế tham khảo:
+- [Luanti — LocalPlayer](https://github.com/luanti-org/luanti/blob/master/src/client/localplayer.cpp):
+  vận tốc mục tiêu và gia tốc riêng, chuyển động ba chiều trong nước.
+- [Godot TPS demo — Player](https://github.com/godotengine/tps-demo/blob/master/player/player.gd):
+  tách input, chuyển động và hướng mô hình; nội suy chuyển động/camera.
+- [Unity Mathf](https://github.com/Unity-Technologies/UnityCsReference/blob/master/Runtime/Export/Math/Mathf.cs):
+  damping theo thời gian và xử lý vượt mục tiêu. ABYSSAL dùng tích phân hàm mũ
+  của riêng mình cho vận tốc/góc rẽ, không sao chép bộ điều khiển của các dự án trên.
+
+Giữ nguyên W/A/S/D, chuột, phím mũi tên, Space/C/Ctrl và Shift. Khi thả phím,
+sinh vật trôi chậm dần; S phanh nhanh hơn rồi chuyển sang lùi. W + Space không
+cộng thêm tốc độ đường chéo. Có hỗ trợ nâng nhẹ trước đáy đang dốc lên, nhưng
+phím lặn vẫn được ưu tiên đến khi chạm đáy. Camera giữ đường chân trời ổn định,
+thu ngắn khoảng bám nếu bị đáy biển che. Hỗ trợ va chạm ở đây chỉ dùng địa hình
+đáy biển và bờ, chưa phải va chạm với từng vật trang trí.
+
+Input được xoá khi mất focus, ẩn tab, nhả pointer lock hoặc mở bảng tra cứu.
+Các phím nhập trong ô seed không kích hoạt điều khiển game.

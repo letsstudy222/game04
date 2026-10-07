@@ -1,285 +1,254 @@
-// player.js — ABZÛ-style swimming. Designed against motion sickness:
-//   1. Roll comes from TURN RATE, not raw mouse delta, and always self-levels.
-//   2. Pitch is clamped to ±60° so "up" never becomes ambiguous.
-//   3. The camera lags behind the fish (spring damping) instead of snapping.
-//   4. Camera pitch is softened (60% of body pitch) to keep a stable horizon.
-//   5. Low drag + quick acceleration so the fish feels responsive, not soupy.
-
+// Swimming controller: angular speeds use radians/second, while mouse input
+// remains a displacement. Small physics steps keep terrain contact stable.
 import { CONFIG, cruiseFor } from '../config.js';
 import { buildCreature, animateCreature } from './fishMesh.js';
 import { currentAt, currentFactorAtDepth } from '../world/currents.js';
 import * as THREE from 'three';
 
-const MAX_PITCH = Math.PI / 3;          // 60°
+const MAX_PITCH = Math.PI / 3;
+const PHYSICS_STEP = 1 / 120;
 const _dir = new THREE.Vector3();
+const _desiredVel = new THREE.Vector3();
+const _previousVel = new THREE.Vector3();
+const _displacement = new THREE.Vector3();
 const _desiredCamPos = new THREE.Vector3();
 const _camTarget = new THREE.Vector3();
+const _back = new THREE.Vector3();
+const _probe = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
+const damp = (rate, dt) => -Math.expm1(-rate * dt);
+const axis = (positive, negative) => Number(positive) - Number(negative);
 
 export class Player {
   constructor(species, camera, input, startPos) {
     this.species = species;
     this.camera = camera;
     this.input = input;
-
     this.mesh = buildCreature(species, Math.random(), 'high');
-    this.mesh._lod = 0;                 // the one you are looking at is never reduced
+    this.mesh._lod = 0;
     this.mesh.position.copy(startPos);
-
     this.yaw = 0;
     this.pitch = 0;
     this.roll = 0;
     this.vel = new THREE.Vector3();
-
-    // smoothed look input — removes mouse jitter, the #1 nausea source
+    this._flow = new THREE.Vector3();
     this._yawVel = 0;
     this._pitchVel = 0;
-    // Camera orbit lock: the camera stops chasing the body and holds the angle
-    // it was at, so you can watch your animal swim past instead of staring at
-    // the back of its head. Movement is unaffected.
     this.camLock = false;
     this.camLockYaw = 0;
     this.camLockPitch = 0;
-
-    // camera state (lags the body)
     this.camYaw = 0;
     this.camPitch = 0;
-
     this.cruise = cruiseFor(species) * 1.3;
-
-    // --- Mass-based handling -------------------------------------------
-    // A 28 m whale should not pivot like a 9 cm clownfish. Three quantities
-    // scale with body length so large animals feel like they carry momentum:
-    //   agility  — how quickly turn input is taken up and shed (inertia)
-    //   maxTurn  — hard ceiling on angular velocity
-    //   thrustLag— how slowly speed builds and bleeds off
     const L = species.length;
-    this.agility = THREE.MathUtils.clamp(14 / Math.pow(L, 0.55), 2.0, 14);
-    this.maxTurn = THREE.MathUtils.clamp(3.4 / Math.pow(L, 0.34), 0.55, 6.0);
-    this.thrustLag = THREE.MathUtils.clamp(7.5 / Math.pow(L, 0.42), 1.1, 7.5);
+    this.agility = THREE.MathUtils.clamp(14 / Math.pow(L, 0.55), 2.8, 14);
+    this.maxTurn = THREE.MathUtils.clamp(3.4 / Math.pow(L, 0.34), 0.55, 6);
+    this.thrustLag = THREE.MathUtils.clamp(7.5 / Math.pow(L, 0.42), 1.8, 7.5);
+    this.coastDrag = THREE.MathUtils.clamp(1.1 / Math.pow(L, 0.22), 0.45, 1.4);
     this.bankAmount = THREE.MathUtils.clamp(0.28 + L * 0.02, 0.28, 0.62);
-    // Sub-linear camera pull-back (length^0.72). Large animals deliberately
-    // overflow the frame — that overflow IS the feeling of size. Linear
-    // scaling would give every species an identical screen footprint.
-    this.camDist = 2.05 * Math.pow(species.length, 0.72) + 1.15;
-    this.camHigh = 0.42 * Math.pow(species.length, 0.72) + 0.28;
+    this.clearance = Math.max(0.12, L * 0.18);
+    this.camDist = 2.05 * Math.pow(L, 0.72) + 1.15;
+    this.camHigh = 0.42 * Math.pow(L, 0.72) + 0.28;
     this.baseFov = camera.fov;
-    // Scroll-wheel zoom multiplier on the follow distance, and an eye-level
-    // first-person mode. Both are remembered per species instance.
     this.camZoom = 1;
+    this._zoomTarget = 1;
     this.firstPerson = false;
-
+    this._cameraTarget = startPos.clone();
+    this._getFloorY = null;
     this._updateCamera(1, true);
   }
 
   toggleFirstPerson() {
     this.firstPerson = !this.firstPerson;
-    // Hide the body: from inside the head you would otherwise see back faces.
     this.mesh.visible = !this.firstPerson;
     this._updateCamera(1, true);
     return this.firstPerson;
   }
 
   update(dt, getFloorY) {
+    if (!Number.isFinite(dt) || dt <= 0) return;
+    // A suspended tab cannot deliver a giant catch-up step.
+    dt = Math.min(dt, 0.1);
+    this._getFloorY = getFloorY;
     const inp = this.input;
+    const wh = inp.consumeWheel?.() || 0;
+    this._zoomTarget = THREE.MathUtils.clamp(this._zoomTarget * Math.exp(wh * 0.0011), 0.25, 3);
+    this.camZoom += (this._zoomTarget - this.camZoom) * damp(9, dt);
 
-    // --- scroll wheel pulls the camera in and out ---
-    const wh = inp.consumeWheel ? inp.consumeWheel() : 0;
-    if (wh) {
-      this.camZoom = THREE.MathUtils.clamp(
-        this.camZoom * Math.exp(wh * 0.0011), 0.25, 3.0);
-    }
-
-    // ---- look input: mouse + keys, both fed through the same smoother ----
     const [mdx, mdy] = inp.consumeMouse();
-    const sens = 0.0016;
-    let yawInput = -mdx * sens / Math.max(dt, 0.001) * 0.016;
-    let pitchInput = -mdy * sens / Math.max(dt, 0.001) * 0.016;
+    const yawKeys = axis(inp.down('KeyA') || inp.down('ArrowLeft'), inp.down('KeyD') || inp.down('ArrowRight'));
+    const pitchKeys = axis(inp.down('ArrowUp'), inp.down('ArrowDown'));
+    const yawRate = THREE.MathUtils.clamp(yawKeys * CONFIG.player.turnSpeed - mdx * 0.0016 / dt, -this.maxTurn, this.maxTurn);
+    const pitchRate = THREE.MathUtils.clamp(pitchKeys * CONFIG.player.turnSpeed * 0.7 - mdy * 0.0016 / dt, -this.maxTurn * 0.7, this.maxTurn * 0.7);
+    const forward = axis(inp.down('KeyW'), inp.down('KeyS'));
+    const vertical = axis(inp.down('Space'), inp.down('ControlLeft') || inp.down('ControlRight') || inp.down('KeyC'));
+    const boost = forward > 0 && (inp.down('ShiftLeft') || inp.down('ShiftRight')) ? CONFIG.player.boostMultiplier : 1;
+    const steps = Math.max(1, Math.ceil(dt / PHYSICS_STEP - 1e-9));
+    const step = dt / steps;
+    for (let i = 0; i < steps; i++) this._move(step, yawRate, pitchRate, forward, vertical, boost, getFloorY);
 
-    const kTurn = CONFIG.player.turnSpeed;
-    if (inp.down('KeyA') || inp.down('ArrowLeft')) yawInput += kTurn * dt;
-    if (inp.down('KeyD') || inp.down('ArrowRight')) yawInput -= kTurn * dt;
-    if (inp.down('ArrowUp')) pitchInput += kTurn * dt * 0.7;
-    if (inp.down('ArrowDown')) pitchInput -= kTurn * dt * 0.7;
-
-    // Critically-damped smoothing. The rate is the animal's agility, so a
-    // whale takes roughly a second to commit to a turn and just as long to
-    // come out of it, while a small fish responds almost instantly.
-    const smooth = 1 - Math.exp(-this.agility * dt);
-    this._yawVel += (yawInput - this._yawVel) * smooth;
-    this._pitchVel += (pitchInput - this._pitchVel) * smooth;
-
-    // cap angular velocity — big bodies simply cannot rotate quickly
-    const cap = this.maxTurn * dt;
-    this._yawVel = THREE.MathUtils.clamp(this._yawVel, -cap, cap);
-    this._pitchVel = THREE.MathUtils.clamp(this._pitchVel, -cap * 0.7, cap * 0.7);
-
-    this.yaw += this._yawVel;
-    this.pitch = THREE.MathUtils.clamp(this.pitch + this._pitchVel, -MAX_PITCH, MAX_PITCH);
-
-    // heading vector
-    _dir.set(
-      Math.sin(this.yaw) * Math.cos(this.pitch),
-      Math.sin(this.pitch),
-      Math.cos(this.yaw) * Math.cos(this.pitch)
-    ).normalize();
-
-    // ---- thrust ----
-    const boost = (inp.down('ShiftLeft') || inp.down('ShiftRight')) ? CONFIG.player.boostMultiplier : 1;
-    let speed = 0;
-    if (inp.down('KeyW')) speed = this.cruise * boost;
-    else if (inp.down('KeyS')) speed = -this.cruise * 0.45;
-
-    const desiredVel = _dir.clone().multiplyScalar(speed);
-    if (inp.down('Space')) desiredVel.y += this.cruise * 0.65;
-    if (inp.down('ControlLeft') || inp.down('KeyC')) desiredVel.y -= this.cruise * 0.65;
-
-    // Acceleration and coasting scale with mass: a whale takes time to get
-    // going and then glides a long way; a clownfish starts and stops at once.
-    const accel = 1 - Math.exp(-this.thrustLag * dt);
-    this.vel.lerp(desiredVel, accel);
-    if (speed === 0 && !inp.down('Space') && !inp.down('KeyC')) {
-      const drag = 0.7 * Math.min(1, 2.4 / Math.pow(this.species.length, 0.4));
-      this.vel.multiplyScalar(1 - Math.min(0.6, dt * drag));
-    }
-
-    this.mesh.position.addScaledVector(this.vel, dt);
-
-    // Carried by the ocean. This is applied to POSITION rather than folded into
-    // velocity on purpose: the current should move you without changing which
-    // way you are pointing or how fast you appear to be swimming, so drifting
-    // in one stays a passive, weightless thing rather than a speed boost.
-    const cur = currentAt(this.mesh.position.x, this.mesh.position.z);
-    this.current = cur.strength > 0.02 ? cur.name : null;
-    this.currentStrength = cur.strength;
-    if (cur.strength > 0.001) {
-      const f = currentFactorAtDepth(this.mesh.position.y);
-      this.mesh.position.x += cur.vx * f * dt;
-      this.mesh.position.z += cur.vz * f * dt;
-      this.currentVec = { x: cur.vx * f, z: cur.vz * f };
-    } else {
-      this.currentVec = null;
-    }
-
-    // ---- water column limits (soft, no hard stop) ----
-    const floor = getFloorY(this.mesh.position.x, this.mesh.position.z);
-    const minY = floor + this.species.length * 0.7;
-    if (this.mesh.position.y < minY) {
-      this.mesh.position.y += (minY - this.mesh.position.y) * Math.min(1, dt * 8);
-      if (this.vel.y < 0) this.vel.y *= 0.3;
-    }
-    // Surface: a whale, dolphin or turtle must be able to reach the top and
-    // break the water, so the old hard ceiling at -0.4 body lengths is gone.
-    // The body may rise until its back is just proud of the surface; drag
-    // increases sharply in the last body-depth so it feels like breaking out.
-    const backY = this.species.length * 0.12;      // half body depth, roughly
-    const maxY = backY * 0.55;                     // back clears the waterline
-    if (this.mesh.position.y > -backY) {
-      const over = (this.mesh.position.y + backY) / (maxY + backY);
-      if (this.vel.y > 0) this.vel.y *= (1 - Math.min(0.85, over * 0.9));
-    }
-    if (this.mesh.position.y > maxY) {
-      // Firm ceiling. A soft pull alone lost the race against upward thrust,
-      // letting the body climb past the limit it was meant to hold.
-      this.mesh.position.y = maxY;
-      if (this.vel.y > 0) this.vel.y = 0;
-    }
-    this.atSurface = this.mesh.position.y > -backY * 1.6;
-
-    // ---- banking: driven by TURN RATE, auto-levels to 0 ----
-    const rollGain = 9 * (this.bankAmount / 0.45);
-    const targetRoll = THREE.MathUtils.clamp(this._yawVel * rollGain, -this.bankAmount, this.bankAmount);
-    this.roll += (targetRoll - this.roll) * Math.min(1, dt * (1.2 + this.agility * 0.2));
-
-    _e.set(this.pitch, this.yaw, this.roll, 'YXZ');
+    const speed01 = THREE.MathUtils.clamp(this.vel.length() / this.cruise, 0, 1);
+    // Three's +X rotation points a +Z-facing body down; swimming pitch is up.
+    _e.set(-this.pitch, this.yaw, this.roll, 'YXZ');
     _q.setFromEuler(_e);
-    this.mesh.quaternion.slerp(_q, Math.min(1, dt * (2.5 + this.agility * 0.5)));
-
-    const speed01 = THREE.MathUtils.clamp(this.vel.length() / this.cruise, 0.15, 1);
-    animateCreature(this.mesh, dt, speed01);
-
-    // Speed-reactive FOV: subtle, but it sells momentum on big animals.
-    const targetFov = this.baseFov + speed01 * 7;
+    this.mesh.quaternion.slerp(_q, damp(5 + this.agility * 0.5, dt));
+    animateCreature(this.mesh, dt, Math.max(0.15, speed01));
+    const targetFov = this.baseFov + speed01 * 5;
     if (Math.abs(this.camera.fov - targetFov) > 0.01) {
-      this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, dt * 2.5);
+      this.camera.fov += (targetFov - this.camera.fov) * damp(2.5, dt);
       this.camera.updateProjectionMatrix();
     }
-
     this._updateCamera(dt, false);
   }
 
+  _move(dt, yawRate, pitchRate, forward, vertical, boost, getFloorY) {
+    const turn = damp(this.agility, dt);
+    // Integrate the exponentially smoothed rate exactly, including release.
+    this.yaw += yawRate * dt + (this._yawVel - yawRate) * turn / this.agility;
+    this.pitch += pitchRate * dt + (this._pitchVel - pitchRate) * turn / this.agility;
+    this._yawVel += (yawRate - this._yawVel) * turn;
+    this._pitchVel += (pitchRate - this._pitchVel) * turn;
+    this.pitch = THREE.MathUtils.clamp(this.pitch, -MAX_PITCH, MAX_PITCH);
+    if ((this.pitch >= MAX_PITCH && this._pitchVel > 0) || (this.pitch <= -MAX_PITCH && this._pitchVel < 0)) this._pitchVel = 0;
+    _dir.set(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch));
+
+    let rate = this.coastDrag;
+    _desiredVel.set(0, 0, 0);
+    if (forward || vertical) {
+      // S first brakes forward momentum, then engages a slower reverse.
+      const braking = forward < 0 && this.vel.dot(_dir) > this.cruise * 0.08;
+      const thrust = braking ? 0 : forward * (forward < 0 ? 0.4 : 1);
+      _desiredVel.copy(_dir).multiplyScalar(thrust);
+      _desiredVel.y += vertical * 0.65;
+      // W + Space cannot exceed the intended swim speed diagonally.
+      if (_desiredVel.lengthSq() > 1) _desiredVel.normalize();
+      _desiredVel.multiplyScalar(this.cruise * boost);
+      rate = this.thrustLag * (braking ? 2.8 : 1);
+    }
+
+    const pos = this.mesh.position;
+    const backY = this.species.length * 0.12;
+    const maxY = backY * 0.55;
+    const floor = getFloorY(pos.x, pos.z);
+    // Look ahead along travel and gently lift over rising seafloor. Explicit
+    // descent remains under the player's control until actual floor contact.
+    if (forward > 0 && vertical >= 0) {
+      const lookTime = 0.35;
+      const aheadFloor = getFloorY(pos.x + _desiredVel.x * lookTime, pos.z + _desiredVel.z * lookTime);
+      if (aheadFloor > floor && aheadFloor + this.clearance < maxY) {
+        const lift = (aheadFloor + this.clearance + this.cruise * 0.08 - pos.y) / lookTime;
+        _desiredVel.y = Math.max(_desiredVel.y, Math.min(this.cruise * 0.55, lift));
+        _desiredVel.clampLength(0, this.cruise * boost);
+      }
+    }
+    // Buoyancy resistance eases in near the waterline, using a rate rather
+    // than a fixed multiplier per frame (the old surface drag depended on FPS).
+    if (_desiredVel.y > 0 && pos.y > -backY) {
+      const immersion = THREE.MathUtils.clamp((maxY - pos.y) / Math.max(backY + maxY, 0.01), 0, 1);
+      _desiredVel.y *= immersion;
+    }
+    _previousVel.copy(this.vel);
+    const accel = damp(rate, dt);
+    this.vel.lerp(_desiredVel, accel);
+    // Exact displacement during acceleration/coasting rather than end-speed Euler.
+    _displacement.copy(_previousVel).sub(_desiredVel).multiplyScalar(accel / rate).addScaledVector(_desiredVel, dt);
+
+    const cur = currentAt(pos.x, pos.z);
+    this.current = cur.strength > 0.02 ? cur.name : null;
+    this.currentStrength = cur.strength;
+    const f = currentFactorAtDepth(pos.y);
+    _desiredVel.set(cur.vx * f, 0, cur.vz * f);
+    this._flow.lerp(_desiredVel, damp(3, dt));
+    this.currentVec = this._flow.lengthSq() > 0.0001 ? { x: this._flow.x, z: this._flow.z } : null;
+    _displacement.addScaledVector(this._flow, dt);
+
+    const nextX = pos.x + _displacement.x, nextZ = pos.z + _displacement.z;
+    const nextFloor = getFloorY(nextX, nextZ);
+    if (nextFloor + this.clearance <= maxY) {
+      pos.x = nextX;
+      pos.z = nextZ;
+    } else {
+      // At shore, slide along an available axis instead of climbing onto land.
+      if (getFloorY(nextX, pos.z) + this.clearance <= maxY) pos.x = nextX;
+      else this.vel.x = 0;
+      if (getFloorY(pos.x, nextZ) + this.clearance <= maxY) pos.z = nextZ;
+      else this.vel.z = 0;
+    }
+    pos.y += _displacement.y;
+    const minY = Math.min(maxY, getFloorY(pos.x, pos.z) + this.clearance);
+    if (pos.y < minY) { pos.y = minY; this.vel.y = Math.max(0, this.vel.y); }
+    if (pos.y > maxY) { pos.y = maxY; this.vel.y = Math.min(0, this.vel.y); }
+    this.atSurface = pos.y > -backY * 1.6;
+    // Integrate banking with physics, so low FPS does not exaggerate lean.
+    const speed01 = Math.min(1, this.vel.length() / this.cruise);
+    const targetRoll = -THREE.MathUtils.clamp(this._yawVel / this.maxTurn, -1, 1)
+      * this.bankAmount * Math.min(1, speed01 * 1.5);
+    this.roll += (targetRoll - this.roll) * damp(3 + this.agility * 0.25, dt);
+  }
+
   _updateCamera(dt, instant) {
+    const pos = this.mesh.position;
+    const L = this.species.length;
     if (this.firstPerson) {
-      // Sit at the animal's eye, looking where it looks.
-      const L = this.species.length;
-      const fwd = new THREE.Vector3(
-        Math.sin(this.yaw) * Math.cos(this.pitch),
-        Math.sin(this.pitch),
-        Math.cos(this.yaw) * Math.cos(this.pitch)
-      ).normalize();
-      this.camera.position.copy(this.mesh.position)
-        .addScaledVector(fwd, L * 0.46)
-        .add(new THREE.Vector3(0, L * 0.04, 0));
-      _camTarget.copy(this.camera.position).addScaledVector(fwd, L * 4 + 10);
+      _dir.set(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch));
+      this.camera.position.copy(pos).addScaledVector(_dir, L * 0.46);
+      this.camera.position.y += L * 0.04;
+      if (this._getFloorY) this.camera.position.y = Math.max(this.camera.position.y,
+        this._getFloorY(this.camera.position.x, this.camera.position.z) + 0.12);
+      _camTarget.copy(this.camera.position).addScaledVector(_dir, L * 4 + 10);
       this.camera.up.set(0, 1, 0);
       this.camera.lookAt(_camTarget);
       return;
     }
-
-    // Camera angles chase the body with a lag -> stable horizon, no whip.
-    // When locked they stop chasing and stay where they were.
-    const chase = instant ? 1 : 1 - Math.exp(-5 * dt);
+    const chase = instant ? 1 : damp(6, dt);
     if (this.camLock) {
       this.camYaw = this.camLockYaw;
       this.camPitch = this.camLockPitch;
     } else {
-      let dYaw = this.yaw - this.camYaw;
-      while (dYaw > Math.PI) dYaw -= Math.PI * 2;
-      while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+      const dYaw = Math.atan2(Math.sin(this.yaw - this.camYaw), Math.cos(this.yaw - this.camYaw));
       this.camYaw += dYaw * chase;
-      // only 60% of body pitch -> horizon stays much steadier
       this.camPitch += (this.pitch * 0.6 - this.camPitch) * chase;
     }
-
-    const back = new THREE.Vector3(
-      -Math.sin(this.camYaw) * Math.cos(this.camPitch),
-      -Math.sin(this.camPitch) + 0.28,
-      -Math.cos(this.camYaw) * Math.cos(this.camPitch)
-    ).normalize();
-
-    _desiredCamPos.copy(this.mesh.position)
-      .addScaledVector(back, this.camDist * this.camZoom)
-      .add(new THREE.Vector3(0, this.camHigh * this.camZoom, 0));
-
-    if (instant) this.camera.position.copy(_desiredCamPos);
-    else this.camera.position.lerp(_desiredCamPos, 1 - Math.exp(-7 * dt));
-
-    // Normally the camera leads the fish so you can see where you are going.
-    // Locked, it looks straight at the animal — that is the whole point.
-    if (this.camLock) {
-      _camTarget.copy(this.mesh.position);
-    } else {
-      _camTarget.copy(this.mesh.position).addScaledVector(
-        _dir.set(Math.sin(this.yaw), Math.sin(this.pitch) * 0.5, Math.cos(this.yaw)),
-        this.species.length * 1.6 + 2.5
-      );
+    _back.set(-Math.sin(this.camYaw) * Math.cos(this.camPitch),
+      -Math.sin(this.camPitch) + 0.28, -Math.cos(this.camYaw) * Math.cos(this.camPitch)).normalize();
+    _desiredCamPos.copy(pos).addScaledVector(_back, this.camDist * this.camZoom);
+    _desiredCamPos.y += this.camHigh * this.camZoom;
+    // Predict a little of travel to reduce camera drag without jerking on boost.
+    _desiredCamPos.addScaledVector(this.vel, 0.12);
+    if (this._getFloorY) {
+      const cameraClearance = Math.max(0.18, L * 0.025);
+      // Shorten the boom when the seafloor occludes the fish.
+      for (let i = 1; i <= 8; i++) {
+        _probe.copy(pos).lerp(_desiredCamPos, i / 8);
+        if (_probe.y < this._getFloorY(_probe.x, _probe.z) + cameraClearance) {
+          _desiredCamPos.copy(pos).lerp(_desiredCamPos, (i - 1) / 8);
+          break;
+        }
+      }
     }
-    this.camera.up.set(0, 1, 0);          // never roll the camera -> no nausea
-    this.camera.lookAt(_camTarget);
+    if (instant) this.camera.position.copy(_desiredCamPos);
+    else this.camera.position.lerp(_desiredCamPos, damp(8, dt));
+    if (this._getFloorY) this.camera.position.y = Math.max(this.camera.position.y,
+      this._getFloorY(this.camera.position.x, this.camera.position.z) + Math.max(0.18, L * 0.025));
+    _camTarget.copy(pos);
+    if (!this.camLock) {
+      _dir.set(Math.sin(this.camYaw) * Math.cos(this.camPitch), Math.sin(this.camPitch), Math.cos(this.camYaw) * Math.cos(this.camPitch));
+      _camTarget.addScaledVector(_dir, Math.min(L * 0.6 + 0.8, this.camDist * 0.7));
+      _camTarget.addScaledVector(this.vel, 0.16);
+    }
+    if (instant) this._cameraTarget.copy(_camTarget);
+    else this._cameraTarget.lerp(_camTarget, damp(10, dt));
+    this.camera.up.set(0, 1, 0);
+    this.camera.lookAt(this._cameraTarget);
   }
 
-  /** Freeze / release the camera orbit. Returns the new state. */
   toggleCamLock() {
     this.camLock = !this.camLock;
-    if (this.camLock) {
-      this.camLockYaw = this.camYaw;
-      this.camLockPitch = this.camPitch;
-    }
+    if (this.camLock) { this.camLockYaw = this.camYaw; this.camLockPitch = this.camPitch; }
     return this.camLock;
   }
 
   idleAnimate(dt) { animateCreature(this.mesh, dt, 0.25); }
-
   get position() { return this.mesh.position; }
 }

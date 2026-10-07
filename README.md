@@ -52,11 +52,11 @@ Xong. Mỗi lần `git push` mới, trang tự cập nhật.
 | Phím | Hành động |
 |------|-----------|
 | **W** | Bơi tới |
-| **S** | Bơi lùi / phanh |
+| **S** | Phanh trước, sau đó bơi lùi chậm nếu tiếp tục giữ |
 | **A / D** hoặc **chuột** | Rẽ trái / phải (nhấp chuột để khoá con trỏ, nhìn tự do) |
 | **↑ / ↓** | Ngẩng lên / cúi xuống |
 | **Space** | Bơi lên |
-| **C** | Lặn xuống |
+| **C** hoặc **Ctrl** | Lặn xuống |
 | **Shift** | Tăng tốc |
 | **B** hoặc nút 🔇 | Bật/tắt âm thanh đại dương |
 | **Cuộn chuột** | Phóng to / thu nhỏ khoảng cách camera (0,25×–3×) |

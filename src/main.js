@@ -250,6 +250,7 @@ function toggleWorldMap() {
 }
 
 window.addEventListener('keydown', (e) => {
+  if (e.repeat || e.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
   if (e.code === 'KeyN') { toggleWorldMap(); return; }
   if (e.code === 'Escape' && worldMap.open) { toggleWorldMap(); return; }
   if (e.code === 'KeyM' && (state === 'playing' || state === 'photo')) returnToMenu();
@@ -364,7 +365,7 @@ function daylightAt(t) {
 // --- photo mode: orbiting camera, UI hidden ---
 let photoAngle = 0;
 window.addEventListener('keydown', (e) => {
-  if (e.code !== 'KeyP') return;
+  if (e.code !== 'KeyP' || e.repeat || e.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
   if (state === 'playing') {
     state = 'photo';
     hudEl.classList.add('hidden');
@@ -454,7 +455,9 @@ function checkDiscoveries(dt, pos, biome) {
 let time = 0;
 function animate() {
   requestAnimationFrame(animate);
-  const dt = Math.min(0.05, clock.getDelta());
+  const dt = Math.min(0.1, clock.getDelta());
+  input.setEnabled(state === 'playing' && !worldMap.open
+    && journalEl.classList.contains('hidden') && encycEl.classList.contains('hidden'));
   time += dt;
   if (dt > 0) adaptQuality(dt);
 

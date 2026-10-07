@@ -5,8 +5,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "check": "python3 tools/check-imports.py && python3 tools/check-undefined.py && node tools/verify-gameloop.mjs && node tools/build-all.mjs && node tools/verify-sharks.mjs && node tools/verify-rays.mjs && node tools/verify-reef.mjs && node tools/verify-crabs.mjs && node tools/verify-globe.mjs && node tools/verify-schools.mjs && node tools/verify-currents.mjs && node tools/verify-frenzy.mjs && node tools/verify-dvm.mjs && node tools/verify-landmarks.mjs && node tools/verify-water.mjs && node tools/earth-report.mjs && node tools/scene-cost.mjs",
-    "serve": "npx http-server -p 8000"
+    "check": "python3 tools/check-imports.py && python3 tools/check-undefined.py && node tools/verify-movement.mjs && node tools/verify-gameloop.mjs && node tools/build-all.mjs && node tools/verify-sharks.mjs && node tools/verify-rays.mjs && node tools/verify-reef.mjs && node tools/verify-crabs.mjs && node tools/verify-globe.mjs && node tools/verify-schools.mjs && node tools/verify-currents.mjs && node tools/verify-frenzy.mjs && node tools/verify-dvm.mjs && node tools/verify-landmarks.mjs && node tools/verify-water.mjs && node tools/earth-report.mjs && node tools/scene-cost.mjs",
+    "serve": "npx http-server -p 8000",
+    "check:movement": "node tools/verify-movement.mjs"
   },
   "devDependencies": {
     "three": "^0.160.0"
