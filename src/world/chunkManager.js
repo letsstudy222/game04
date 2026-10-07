@@ -152,6 +152,7 @@ export class ChunkManager {
     // sway kelp
     for (const g of this._swayables) {
       g.children.forEach((blade) => {
+        if (blade.material?.userData.plant) return; // GPU bends rooted leaves.
         const ph = blade.userData.swayPhase || 0;
         const amp = blade.userData.swayAmp || 0.1;
         blade.rotation.x = Math.sin(time * 1.2 + ph) * amp;

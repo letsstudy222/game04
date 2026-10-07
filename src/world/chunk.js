@@ -33,14 +33,14 @@ function makeCoral(accent) {
     const n = 4 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
       const h = 0.7 + Math.random() * 1.9;
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.13, h, 6), m);
+      const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, Math.max(0.1, h - 0.18), 3, 8), m);
       b.position.set((Math.random() - 0.5) * 0.9, h / 2, (Math.random() - 0.5) * 0.9);
       b.rotation.z = (Math.random() - 0.5) * 0.55;
       b.rotation.x = (Math.random() - 0.5) * 0.55;
       g.add(b);
       for (let k = 0; k < 2; k++) {          // side branches
         const bh = h * (0.3 + Math.random() * 0.3);
-        const s2 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, bh, 5), m);
+        const s2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, Math.max(0.05, bh - 0.09), 3, 7), m);
         s2.position.copy(b.position);
         s2.position.y += h * 0.25;
         s2.position.x += (Math.random() - 0.5) * 0.3;
@@ -109,17 +109,38 @@ function makeCoral(accent) {
   return g;
 }
 
+// Curved, tapered ribbons with a rooted base; bend runs on the GPU.
+function plantBlade(width, height, segments) {
+  const geo = new THREE.PlaneGeometry(width, height, 2, segments);
+  geo.translate(0, height / 2, 0);
+  const pos = geo.attributes.position;
+  const growth = [], phase = [], lengths = [];
+  const offset = Math.random() * Math.PI * 2;
+  for (let i = 0; i < pos.count; i++) {
+    const t = pos.getY(i) / height;
+    const x = pos.getX(i) * (0.18 + 0.82 * Math.sin(Math.PI * (0.12 + t * 0.88)));
+    pos.setXYZ(i, x + height * 0.07 * t * t,
+      pos.getY(i), height * 0.045 * Math.sin(t * Math.PI) + x * x / width * 0.3);
+    growth.push(t); phase.push(offset); lengths.push(height);
+  }
+  geo.setAttribute('aGrowth', new THREE.Float32BufferAttribute(growth, 1));
+  geo.setAttribute('aPlantPhase', new THREE.Float32BufferAttribute(phase, 1));
+  geo.setAttribute('aPlantHeight', new THREE.Float32BufferAttribute(lengths, 1));
+  geo.computeVertexNormals();
+  return geo;
+}
+
 function makeKelp() {
   const g = new THREE.Group();
   const tone = Math.random();
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color().setHSL(0.24 + tone * 0.09, 0.42 + tone * 0.2, 0.22 + tone * 0.14),
     flatShading: false, roughness: 0.9, side: THREE.DoubleSide });
+  mat.userData.plant = true;
   const strands = 2 + Math.floor(Math.random() * 3);
   for (let s = 0; s < strands; s++) {
     const h = 4 + Math.random() * 8;
-    const geo = new THREE.PlaneGeometry(0.28 + Math.random() * 0.32, h, 1, 6);
-    geo.translate(0, h / 2, 0);
+    const geo = plantBlade(0.28 + Math.random() * 0.32, h, 8);
     const blade = new THREE.Mesh(geo, mat);
     blade.position.set((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5);
     blade.rotation.y = Math.random() * Math.PI;
@@ -135,7 +156,7 @@ function makeRock() {
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: 0x5a6068, flatShading: false, roughness: 1 });
   const r = 0.8 + Math.random() * 2.2;
-  const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), mat);
+  const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 2), mat);
   rock.scale.set(1, 0.6 + Math.random() * 0.5, 1);
   rock.position.y = r * 0.3;
   g.add(rock);
@@ -175,7 +196,7 @@ function makeJelly() {
     roughness: 0.4, flatShading: false, side: THREE.DoubleSide,
   });
   const bell = new THREE.Mesh(
-    new THREE.SphereGeometry(0.6, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), bellMat);
+    new THREE.SphereGeometry(0.6, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), bellMat);
   g.add(bell);
   const tMat = new THREE.MeshBasicMaterial({ color: 0x9ff0ff, transparent: true, opacity: 0.3 });
   for (let i = 0; i < 5; i++) {
@@ -489,11 +510,11 @@ function makeSeagrass() {
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color().setHSL(0.26 + tone * 0.06, 0.45, 0.26 + tone * 0.10),
     roughness: 0.9, side: THREE.DoubleSide });
+  mat.userData.plant = true;
   const n = 26 + Math.floor(Math.random() * 22);
   for (let i = 0; i < n; i++) {
     const h = 0.22 + Math.random() * 0.75;
-    const geo = new THREE.PlaneGeometry(0.035 + Math.random() * 0.03, h, 1, 4);
-    geo.translate(0, h / 2, 0);
+    const geo = plantBlade(0.035 + Math.random() * 0.03, h, 6);
     const blade = new THREE.Mesh(geo, mat);
     blade.position.set((Math.random() - 0.5) * 2.6, 0, (Math.random() - 0.5) * 2.6);
     blade.rotation.y = Math.random() * Math.PI;

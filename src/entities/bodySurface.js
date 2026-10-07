@@ -18,14 +18,30 @@ import * as THREE from 'three';
 
 // Smooth interpolation across authored stations.
 function sampler(stations, key) {
+  // Shape-preserving cubic Hermite: shared slopes eliminate the repeated
+  // flat spots of smoothstep without overshooting anatomical landmarks.
+  const slopes = stations.slice(1).map((b, i) =>
+    (b[key] - stations[i][key]) / (b.t - stations[i].t));
+  const tangent = stations.map((s, i) => {
+    if (i === 0) return slopes[0];
+    if (i === stations.length - 1) return slopes[i - 1];
+    const a = slopes[i - 1], b = slopes[i];
+    if (a * b <= 0) return 0;
+    const h0 = s.t - stations[i - 1].t, h1 = stations[i + 1].t - s.t;
+    const w0 = 2 * h1 + h0, w1 = h1 + 2 * h0;
+    return (w0 + w1) / (w0 / a + w1 / b);
+  });
   return (t) => {
     t = Math.min(1, Math.max(0, t));
     for (let i = 0; i < stations.length - 1; i++) {
       const a = stations[i], b = stations[i + 1];
       if (t >= a.t && t <= b.t) {
-        const k = b.t === a.t ? 0 : (t - a.t) / (b.t - a.t);
-        const s = k * k * (3 - 2 * k);
-        return a[key] + (b[key] - a[key]) * s;
+        const h = b.t - a.t, u = (t - a.t) / h;
+        const u2 = u * u, u3 = u2 * u;
+        return (2 * u3 - 3 * u2 + 1) * a[key]
+          + (u3 - 2 * u2 + u) * h * tangent[i]
+          + (-2 * u3 + 3 * u2) * b[key]
+          + (u3 - u2) * h * tangent[i + 1];
       }
     }
     return stations[stations.length - 1][key];
@@ -94,6 +110,22 @@ export function organicBody({
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   if (shade) geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.setIndex(idx);
+  // UV seam duplicates share a normal, including after swimming deformation.
+  const computeNormals = geo.computeVertexNormals.bind(geo);
+  geo.computeVertexNormals = () => {
+    computeNormals();
+    const n = geo.attributes.normal;
+    for (let i = 0; i <= segments; i++) {
+      const a = i * stride, b = a + radial;
+      const x = n.getX(a) + n.getX(b);
+      const y = n.getY(a) + n.getY(b);
+      const z = n.getZ(a) + n.getZ(b);
+      const len = Math.hypot(x, y, z) || 1;
+      n.setXYZ(a, x / len, y / len, z / len);
+      n.setXYZ(b, x / len, y / len, z / len);
+    }
+    return geo;
+  };
   geo.computeVertexNormals();
   return geo;
 }
@@ -163,6 +195,9 @@ export function makeSkinTexture(fn, w = 512, h = 512) {
   const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
   tex.needsUpdate = true;
   return tex;
 }
@@ -181,6 +216,9 @@ export function makeBumpTexture(fn, w = 512, h = 512) {
   const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
   tex.needsUpdate = true;
   return tex;
 }

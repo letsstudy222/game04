@@ -7,13 +7,13 @@
 // Directions are unit vectors pointing FROM the surface TOWARDS the light.
 
 export const RIG = {
-  ambient: 0.46,                                   // uniform base
+  ambient: 0.38,                                   // uniform base
   key:  { dir: [-0.45, 0.78, 0.44], intensity: 0.82, color: 0xdff2ff },
-  rim:  { dir: [0.62, 0.25, -0.74], intensity: 0.34, color: 0x7fd7c9 },
+  rim:  { dir: [0.62, 0.25, -0.74], intensity: 0.28, color: 0x9cd9d2 },
   fill: { dir: [0.20, -0.60, 0.35], intensity: 0.20, color: 0x4a7fa0 },
   ambientColor: 0x5c86a0,
   hemiSky: 0xbfe8f7,
-  hemiGround: 0x0b2430,
+  hemiGround: 0x16333b,
   specPower: 26,
   specStrength: 0.5,
 };

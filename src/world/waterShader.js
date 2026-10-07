@@ -87,7 +87,7 @@ export function makeWaterSurface(size = 700, segs = 160) {
 
         // Finite difference at roughly one quad, which is the finest thing the
         // mesh can actually carry.
-        float e = 4.0;
+        float e = 1.0;
         vec3 a = (vec3(xz.x + e, 0.0, xz.y) + waveField(xz + vec2(e, 0.0), uTime)) - p;
         vec3 b = (vec3(xz.x, 0.0, xz.y + e) + waveField(xz + vec2(0.0, e), uTime)) - p;
         vNormal = normalize(cross(b, a));
@@ -161,12 +161,12 @@ export function makeWaterSurface(size = 700, segs = 160) {
         vec3 rn = rippleNormal(vWorld.xz, uTime, detail);
         vec3 t1 = normalize(cross(vec3(0.0, 1.0, 0.0), n) + vec3(0.001));
         vec3 t2 = cross(n, t1);
-        n = normalize(n + (t1 * rn.x + t2 * rn.z) * 0.75 * uWind * step(0.01, detail));
+        n = normalize(n + (t1 * rn.x + t2 * rn.z) * 0.32 * uWind * smoothstep(0.0, 0.8, detail));
 
         bool below = uCamY < 0.0;
         if (below) n = -n;
 
-        float fres = pow(1.0 - clamp(dot(n, view), 0.0, 1.0), 3.0);
+        float fres = 0.0204 + 0.9796 * pow(1.0 - clamp(dot(n, view), 0.0, 1.0), 5.0);
 
         // Foam: breaking crests, broken up by noise so the line is ragged
         // rather than a clean contour, and thinned where the sea is calm.
@@ -185,7 +185,8 @@ export function makeWaterSurface(size = 700, segs = 160) {
           // ---- Snell's window -------------------------------------------
           // Looking up, refraction squeezes the whole sky into a disc about 97
           // degrees across. Outside it the underside mirrors the sea back.
-          float up = clamp(dot(view, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
+          // view points toward the camera; Snell uses the viewing ray toward the sky.
+          float up = clamp(dot(-view, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
           // the rim wobbles with the surface instead of being a perfect circle
           float wob = gnoise(vWorld.xz * 0.06 + uTime * 0.15) * 0.05;
           float window = smoothstep(0.60 + wob, 0.80 + wob, up);
@@ -193,8 +194,8 @@ export function makeWaterSurface(size = 700, segs = 160) {
           vec3 inside = mix(uShallow, uSky, 0.55) * (0.35 + 0.65 * uDaylight);
 
           vec3 sunView = normalize(uSunDir + n * 0.35);
-          float sun = pow(max(dot(view, sunView), 0.0), 220.0);
-          float glow = pow(max(dot(view, sunView), 0.0), 14.0);
+          float sun = pow(max(dot(-view, sunView), 0.0), 220.0);
+          float glow = pow(max(dot(-view, sunView), 0.0), 14.0);
 
           col = mix(outside, inside, window);
           col += vec3(1.0, 0.96, 0.86) * sun * 2.8 * uDaylight * window;
@@ -236,9 +237,9 @@ export function makeWaterSurface(size = 700, segs = 160) {
           // tiny angles at once, so the specular is driven by the PERTURBED
           // normal and kept very tight.
           vec3 h = normalize(uSunDir + view);
-          float spec = pow(max(dot(n, h), 0.0), 400.0);
+          float spec = pow(max(dot(n, h), 0.0), 260.0);
           float broad = pow(max(dot(n, h), 0.0), 60.0);
-          col += vec3(1.0, 0.97, 0.90) * (spec * 3.4 + broad * 0.35) * uDaylight;
+          col += vec3(1.0, 0.97, 0.90) * (spec * 2.2 + broad * 0.28) * uDaylight;
 
           col *= (0.30 + 0.70 * uDaylight);
           col = mix(col, vec3(0.95, 0.99, 1.0) * (0.35 + 0.65 * uDaylight), foam * 0.85);
@@ -351,6 +352,23 @@ export function applyCaustics(material) {
   if (!material || material.userData._caustic) return material;
   material.userData._caustic = true;
   material.onBeforeCompile = (shader) => {
+    if (material.userData.plant) {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>
+          uniform float uPlantTime;
+          attribute float aGrowth, aPlantPhase, aPlantHeight;
+          vec2 plantBend(float t) {
+            return vec2(sin(uPlantTime * 0.8 + aPlantPhase - t * 1.8),
+              cos(uPlantTime * 0.6 + aPlantPhase - t * 1.3)) * vec2(0.12, 0.07);
+          }`)
+        .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+          vec2 bendSlope = (plantBend(aGrowth + 0.01) * pow(aGrowth + 0.01, 2.0)
+            - plantBend(aGrowth) * aGrowth * aGrowth) / 0.01;
+          objectNormal.y -= dot(bendSlope, objectNormal.xz);`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          transformed.xz += plantBend(aGrowth) * aPlantHeight * aGrowth * aGrowth;`);
+      shader.uniforms.uPlantTime = CAUSTIC.time;
+    }
     shader.uniforms.uCTime = CAUSTIC.time;
     shader.uniforms.uCDay = CAUSTIC.daylight;
     shader.uniforms.uCAmt = CAUSTIC.strength;
@@ -374,6 +392,7 @@ export function applyCaustics(material) {
            gl_FragColor.rgb += vec3(0.55, 0.85, 0.78) * c * 0.85;
          }`);
   };
+  material.customProgramCacheKey = () => material.userData.plant ? 'caustics-plant-v1' : 'caustics-v1';
   material.needsUpdate = true;
   return material;
 }
